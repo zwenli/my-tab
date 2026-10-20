@@ -115,6 +115,8 @@ const zhCN: Messages = {
   'group.createdAt': '创建于 {time}',
   'group.updatedAt': '更新于 {time}',
   'group.mergeHint': '松开即可与目标组合并',
+  'group.mergeTarget': '合并到此组',
+  'group.lockedDrop': '锁定组不接受拖入的标签。',
   'group.dropToNew': '松开即可创建一个新组',
   'group.moveUp': '上移',
   'group.moveDown': '下移',

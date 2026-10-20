@@ -83,6 +83,12 @@ export const useUiStore = defineStore('ui', () => {
   const drag = ref<DragPayload | null>(null)
   const dropTarget = ref<DropTarget | null>(null)
 
+  /** 拖拽结束（松手 / 取消 / 落到别处）必须调用，避免拖拽状态残留 */
+  function resetDrag(): void {
+    drag.value = null
+    dropTarget.value = null
+  }
+
   /* ---------------------------- 提示 ---------------------------- */
 
   const toasts = ref<Toast[]>([])
@@ -144,6 +150,7 @@ export const useUiStore = defineStore('ui', () => {
     sidebarCollapsed,
     drag,
     dropTarget,
+    resetDrag,
     toasts,
     toast,
     dismissToast,

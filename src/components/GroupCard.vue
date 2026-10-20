@@ -12,7 +12,7 @@ import { useUiStore } from '@/stores/ui'
 import { useI18n } from '@/composables/useI18n'
 import { useActions } from '@/composables/useActions'
 import { humanTime } from '@/core/utils'
-import type { DropTarget, Group, MenuItem, TabItem } from '@/types'
+import type { Group, MenuItem, TabItem } from '@/types'
 
 const props = defineProps({
   group: { type: Object as PropType<Group>, required: true },
@@ -141,46 +141,31 @@ function onDragStart(e: DragEvent): void {
 }
 
 function onDragEnd(e: DragEvent): void {
-  ui.drag = null
-  ui.dropTarget = null
+  ui.resetDrag()
   emit('dragend', e)
 }
 
-function onDragOver(e: DragEvent): void {
-  if (!ui.drag) return
-  if (ui.drag.kind === 'group' && ui.drag.id === props.group.id) return
-  const tag: DropTarget = { kind: 'group', id: props.group.id }
-  if (ui.dropTarget?.kind !== tag.kind || ui.dropTarget?.id !== tag.id) ui.dropTarget = tag
-  e.preventDefault()
-  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-}
-
+/**
+ * 只处理「标签拖进本组」。
+ * 组的排序 / 合并落点由列表页画布统一判定（见 pages/list/App.vue），
+ * 卡片不再抢 dragover，否则两条判定线会互相打架，导致想排序却合并。
+ */
 async function onDrop(e: DragEvent): Promise<void> {
+  const drag = ui.drag
+  if (!drag || drag.kind !== 'tab') return
   e.preventDefault()
   e.stopPropagation()
-  const drag = ui.drag
-  ui.dropTarget = null
-  if (!drag) return
+  ui.resetDrag()
 
-  if (drag.kind === 'group') {
-    if (drag.id === props.group.id) return
-    if (props.group.locked) {
-      ui.toast(t('group.deleteLocked'), 'warning')
-      return
-    }
-    await data.mergeGroups(drag.id, props.group.id)
-    ui.toast(t('toast.merged'), 'success')
+  if (drag.groupId === props.group.id) return
+  if (props.group.locked) {
+    ui.toast(t('group.lockedDrop'), 'warning')
     return
   }
-
-  if (drag.kind === 'tab') {
-    if (drag.groupId === props.group.id) return
-    if (props.group.locked) return
-    const ids = ui.hasSelection && ui.selected.has(drag.id) ? ui.selectedIds : [drag.id]
-    await data.moveItemsToGroup(ids, props.group.id, -1)
-    ui.clearSelection()
-    ui.toast(t('toast.moved'), 'success')
-  }
+  const ids = ui.hasSelection && ui.selected.has(drag.id) ? ui.selectedIds : [drag.id]
+  await data.moveItemsToGroup(ids, props.group.id, -1)
+  ui.clearSelection()
+  ui.toast(t('toast.moved'), 'success')
 }
 
 async function onItemRemove(item: TabItem): Promise<void> {
@@ -200,10 +185,6 @@ function onItemDragStart(): void {
   /* 由 TabRow 写入 ui.drag */
 }
 
-function onListDragOver(e: DragEvent): void {
-  onDragOver(e)
-}
-
 function toggleSelect(): void {
   ui.toggleSelected(props.group.id)
 }
@@ -216,8 +197,6 @@ function toggleSelect(): void {
     :draggable="!selectable"
     @dragstart="onDragStart"
     @dragend="onDragEnd"
-    @dragover="onDragOver"
-    @dragleave="isDropTarget && (ui.dropTarget = null)"
     @drop="onDrop"
   >
     <header class="head">
@@ -244,6 +223,7 @@ function toggleSelect(): void {
       </div>
 
       <div class="badges">
+        <span v-if="isDropTarget && collapsed" class="merge-chip"><Icon name="layers" :size="11" />{{ t('group.mergeTarget') }}</span>
         <Icon v-if="group.locked" name="lock" :size="13" class="b-lock" :aria-label="t('group.lock')" />
         <Icon v-if="group.starred" name="star" :size="13" class="b-star" filled :aria-label="t('group.star')" />
       </div>
@@ -273,7 +253,7 @@ function toggleSelect(): void {
 
     <p v-if="group.note && !collapsed" class="note">{{ group.note }}</p>
 
-    <div v-if="!collapsed" class="body" @dragover="onListDragOver">
+    <div v-if="!collapsed" class="body">
       <ul class="items">
         <TabRow
           v-for="(it, i) in group.items"
@@ -437,6 +417,17 @@ function toggleSelect(): void {
 }
 .b-lock {
   color: var(--warning);
+}
+.merge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: var(--text-xs);
+  white-space: nowrap;
 }
 .acts {
   flex: none;

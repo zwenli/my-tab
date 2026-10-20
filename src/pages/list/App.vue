@@ -19,6 +19,7 @@ import { useUiStore, SCOPE } from '@/stores/ui'
 import { useI18n } from '@/composables/useI18n'
 import { useActions } from '@/composables/useActions'
 import { useTheme } from '@/composables/useTheme'
+import { applyVisibleOrder, clampPinnedIndex, hitTest, moveToInsertPoint, sameOrder } from '@/core/dragOrder'
 import type { Group, TabItem } from '@/types'
 
 const data = useDataStore()
@@ -68,82 +69,193 @@ const scopeTitle = computed<string>(() => {
 
 const showFavicons = computed<boolean>(() => data.settings.showFavicons !== false)
 
-/* ------------------------- 拖拽 ------------------------- */
+/* ------------------------- 拖拽 -------------------------
+ *
+ * 拖拽状态分成三份，职责单一：
+ *   ui.drag        —— 谁在被拖（由 TabRow / GroupCard 在 dragstart 写入）
+ *   ui.dropTarget  —— 合并目标组（只有落在卡片「中间窄带」才是合并）
+ *   dropIndex      —— 排序线位置（落在卡片上/下段或卡片之间的空隙）
+ *
+ * 判定统一放在画布上（dragover 会从卡片冒泡上来），卡片自身不再抢事件，
+ * 这样「排序」和「合并」永远只有一个生效，不会互相打架。
+ * 排序线用 height:0 + 负 margin 画，出现时不挤动卡片，避免判定抖动。
+ */
 
-const isDraggingGroup = computed<boolean>(() => ui.drag?.kind === 'group')
+/** 卡片上下各留 30% 给排序，中间 40% 才合并 —— 排序区更大，减少误触 */
+const REORDER_ZONE = 0.3
+/** 标签拖拽时对卡片边缘的吸附容差，吃掉卡片之间 10px 的间隙 */
+const TAB_SNAP = 6
+
 const isDraggingTab = computed<boolean>(() => ui.drag?.kind === 'tab')
 
-function onCanvasDragOver(e: DragEvent): void {
-  if (showSearch.value || showQuickFull.value) return
-  if (isDraggingGroup.value) {
-    e.preventDefault()
-    const cards = canvas.value ? [...canvas.value.querySelectorAll('[data-group-id]')] : []
-    let idx = cards.length
-    for (let i = 0; i < cards.length; i++) {
-      const r = cards[i]!.getBoundingClientRect()
-      if (e.clientY < r.top + r.height / 2) {
-        idx = i
-        break
-      }
-    }
-    dropIndex.value = idx
-    canvasHint.value = false
-  } else if (isDraggingTab.value) {
-    e.preventDefault()
-    dropIndex.value = -1
-    canvasHint.value = true
+const lockedIds = computed<Set<string>>(() => new Set(data.groups.filter((g) => g.locked).map((g) => g.id)))
+
+/** 星标段的长度：星标组永远排在前面，拖拽不能跨过这条线 */
+const pinnedCount = computed<number>(() => {
+  if (!data.settings.starPinsToTop) return 0
+  const list = visibleGroups.value
+  let n = 0
+  while (n < list.length && list[n]!.starred) n++
+  return n
+})
+
+interface CardBox {
+  id: string
+  top: number
+  bottom: number
+}
+
+/** 读取当前渲染出来的卡片盒子（顺序 = visibleGroups 顺序） */
+function cardBoxes(): CardBox[] {
+  const el = canvas.value
+  if (!el) return []
+  return [...el.querySelectorAll<HTMLElement>('[data-group-id]')].map((node) => {
+    const r = node.getBoundingClientRect()
+    return { id: node.dataset.groupId || '', top: r.top, bottom: r.bottom }
+  })
+}
+
+function clearDropMarks(): void {
+  dropIndex.value = -1
+  canvasHint.value = false
+  if (ui.dropTarget?.kind === 'group') ui.dropTarget = null
+}
+
+/** 合并目标只在画布判定里写，避免卡片自身的 dragleave 把它抖没 */
+function setMergeTarget(id: string): void {
+  if (!id) {
+    if (ui.dropTarget?.kind === 'group') ui.dropTarget = null
+    return
   }
+  if (ui.dropTarget?.kind === 'group' && ui.dropTarget.id === id) return
+  ui.dropTarget = { kind: 'group', id }
+}
+
+function onCanvasDragOver(e: DragEvent): void {
+  const drag = ui.drag
+  if (!drag || (drag.kind !== 'group' && drag.kind !== 'tab')) return
+  if (showSearch.value || showQuickFull.value) return
+
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+
+  const boxes = cardBoxes()
+  const tops = boxes.map((b) => b.top)
+  const bottoms = boxes.map((b) => b.bottom)
+  const from = drag.kind === 'group' ? boxes.findIndex((b) => b.id === drag.id) : -1
+
+  const hit = hitTest({
+    tops,
+    bottoms,
+    clientY: e.clientY,
+    zone: REORDER_ZONE,
+    mergeAnyBand: drag.kind === 'tab',
+    snap: TAB_SNAP,
+    // 自己不能合并到自己；锁定组不收外来内容
+    canMerge: (i) => {
+      const box = boxes[i]
+      if (!box || !box.id) return false
+      if (drag.kind === 'group' && box.id === drag.id) return false
+      return !lockedIds.value.has(box.id)
+    }
+  })
+
+  if (hit.mergeIndex >= 0) {
+    setMergeTarget(boxes[hit.mergeIndex]?.id || '')
+    dropIndex.value = -1
+    canvasHint.value = false
+    return
+  }
+
+  setMergeTarget('')
+
+  if (drag.kind === 'tab') {
+    // 标签拖拽只关心「落在卡片上（交给卡片处理）」还是「落在空白处（新建组）」
+    dropIndex.value = -1
+    canvasHint.value = !boxes.some((b) => e.clientY >= b.top - TAB_SNAP && e.clientY <= b.bottom + TAB_SNAP)
+    return
+  }
+
+  // 落回自己身上等于没动，不画线，避免「线在自己头上」的困惑；
+  // 星标置顶时把落点夹在本组所属的那一段，线画在哪就落在哪
+  const target = clampPinnedIndex(hit.index, from, pinnedCount.value)
+  const noop = from >= 0 && (target === from || target === from + 1)
+  dropIndex.value = noop ? -1 : target
+  canvasHint.value = false
 }
 
 function onCanvasDragLeave(e: DragEvent): void {
-  if (e.currentTarget === e.target) {
-    dropIndex.value = -1
-    canvasHint.value = false
-  }
+  // dragleave 会从卡片冒泡上来，也可能 relatedTarget 为 null，
+  // 所以直接用指针坐标判断是否真的离开了画布
+  const el = canvas.value
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return
+  clearDropMarks()
 }
 
 async function onCanvasDrop(e: DragEvent): Promise<void> {
+  // 先把落点读出来，再清状态 —— 顺序反了会读到默认值（这正是「拖到第一位却跑到最后」的原因）
   const drag = ui.drag
-  dropIndex.value = -1
-  canvasHint.value = false
+  const insertAt = dropIndex.value
+  const mergeId = ui.dropTarget?.kind === 'group' ? ui.dropTarget.id : ''
+  const blank = canvasHint.value
+  ui.resetDrag()
+  clearDropMarks()
   if (!drag) return
   e.preventDefault()
 
   if (drag.kind === 'group') {
-    await reorderVisible(drag.id, dropIndex.value < 0 ? visibleGroups.value.length : dropIndex.value)
+    if (mergeId && mergeId !== drag.id) {
+      await data.mergeGroups(drag.id, mergeId)
+      ui.toast(t('toast.merged'), 'success')
+      return
+    }
+    if (insertAt >= 0) await reorderVisible(drag.id, insertAt)
     return
   }
 
-  if (drag.kind === 'tab') {
+  if (drag.kind === 'tab' && blank) {
     const ids = ui.hasSelection && ui.selected.has(drag.id) ? ui.selectedIds : [drag.id]
-    const items = ids.map((id) => data.itemIndex.get(id)?.item).filter((i): i is TabItem => !!i)
-    if (!items.length) return
-    await data.createGroupFromItems(
-      items.map((i) => ({ url: i.url, title: i.title, favIconUrl: i.favIconUrl })),
-      { title: '' }
-    )
-    await data.removeItems(ids)
-    ui.clearSelection()
-    ui.toast(t('toast.groupCreated'), 'success')
+    await dropTabsToNewGroup(ids)
   }
+}
+
+/** 标签拖到画布空白处：把这些条目收成一个新组 */
+async function dropTabsToNewGroup(ids: string[]): Promise<void> {
+  const items = ids.map((id) => data.itemIndex.get(id)?.item).filter((i): i is TabItem => !!i)
+  if (!items.length) return
+  await data.createGroupFromItems(
+    items.map((i) => ({ url: i.url, title: i.title, favIconUrl: i.favIconUrl })),
+    { title: '' }
+  )
+  await data.removeItems(ids)
+  ui.clearSelection()
+  ui.toast(t('toast.groupCreated'), 'success')
 }
 
 /**
  * 在「可见列表」内重排，并映射回全局顺序 —— 这样即使处于筛选视图也不会打乱其他组。
  */
-async function reorderVisible(id: string, insertAt: number): Promise<void> {
+async function reorderVisible(id: string, insertBefore: number): Promise<void> {
   const visible = visibleGroups.value.map((g) => g.id)
   const from = visible.indexOf(id)
   if (from < 0) return
-  const [moved] = visible.splice(from, 1)
-  const target = insertAt > from ? insertAt - 1 : insertAt
-  visible.splice(Math.max(0, Math.min(visible.length, target)), 0, moved)
-
-  const visibleSet = new Set(visible)
-  let vi = 0
-  const nextOrder = data.groups.map((g) => (visibleSet.has(g.id) ? visible[vi++] : g.id))
-  await data.reorderGroups(nextOrder)
+  const moved = moveToInsertPoint(visible, from, insertBefore)
+  if (sameOrder(visible, moved)) return // 位置没变，不写盘
+  await data.reorderGroups(applyVisibleOrder(data.groups.map((g) => g.id), moved))
 }
+
+/**
+ * 拖拽结束的兜底：松手、Esc 取消、把卡片拖到窗口外……所有路径最终都会把 ui.drag 置空，
+ * 在这里统一清掉排序线与合并高亮，drop-line 就不会滞留在页面上。
+ */
+watch(
+  () => ui.drag,
+  (v) => {
+    if (!v) clearDropMarks()
+  }
+)
 
 /* ------------------------- 键盘 ------------------------- */
 
@@ -338,23 +450,39 @@ function collect(): void {
   border-radius: var(--radius-pill);
 }
 .canvas {
+  --card-gap: 10px;
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--card-gap);
   min-height: 120px;
+  padding-bottom: 18px;
 }
 .canvas.drag-tab {
   outline: 1.5px dashed var(--border-strong);
   outline-offset: 8px;
   border-radius: var(--radius-lg);
 }
+/**
+ * 排序线：高度 0 + 负 margin，出现时完全不挤动卡片。
+ * 卡片不位移，命中判定的坐标就是稳定的，不会出现「线来回跳」。
+ */
 .drop-line {
-  height: 3px;
-  border-radius: 3px;
+  height: 0;
+  margin-top: calc(-1 * var(--card-gap));
+  position: relative;
+  pointer-events: none;
+}
+.drop-line::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: calc(var(--card-gap) / 2 - 2px);
+  height: 4px;
+  border-radius: 4px;
   background: var(--primary);
   box-shadow: 0 0 0 4px var(--primary-soft);
-  margin: -3px 4px;
   animation: fade-in 120ms ease-out;
 }
 .canvas-drop {

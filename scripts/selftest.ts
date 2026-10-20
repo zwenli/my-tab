@@ -12,6 +12,7 @@ import * as M from '../src/core/mutations'
 import { searchItems } from '../src/core/search'
 import { exportToHtml, exportToText, parseText } from '../src/core/exportImport'
 import { buildPayload, linksText, packPayload, renderShareText, renderStandaloneHtml, unpackPayload } from '../src/core/share'
+import { applyVisibleOrder, clampPinnedIndex, hitTest, moveToInsertPoint, sameOrder } from '../src/core/dragOrder'
 import { resolveTipDir, resolveTipPos } from '../src/directives/tipGeometry'
 import type { CollectableTab, MyTabState, TaskFlag } from '../src/types'
 
@@ -434,6 +435,81 @@ const run = async (): Promise<void> => {
   await test('朝下时 y 取元素下沿 + 间距', () => {
     const rect = { left: 100, top: 10, right: 130, bottom: 38, width: 30, height: 28 }
     assert.deepEqual(resolveTipPos(rect, 80, 26, 'bottom', 8, { vw: 1200, vh: 800 }), { x: 75, y: 46 })
+  })
+
+  console.log('\n[8] 拖拽排序')
+
+  await test('拖到第一位：插到最前，而不是跑到末尾', () => {
+    assert.deepEqual(moveToInsertPoint(['a', 'b', 'c', 'd'], 2, 0), ['c', 'a', 'b', 'd'])
+    assert.deepEqual(moveToInsertPoint(['a', 'b', 'c', 'd'], 3, 0), ['d', 'a', 'b', 'c'])
+  })
+
+  await test('拖到末尾 / 向下移动时下标左移一位', () => {
+    assert.deepEqual(moveToInsertPoint(['a', 'b', 'c', 'd'], 0, 4), ['b', 'c', 'd', 'a'])
+    // 插到 c 之前（移动前的下标 2），a 抽走后 c 变成下标 1
+    assert.deepEqual(moveToInsertPoint(['a', 'b', 'c', 'd'], 0, 2), ['b', 'a', 'c', 'd'])
+    assert.deepEqual(moveToInsertPoint(['a', 'b', 'c', 'd'], 1, 4), ['a', 'c', 'd', 'b'])
+  })
+
+  await test('落回原位是空操作（不写盘）', () => {
+    const before = ['a', 'b', 'c']
+    assert.deepEqual(moveToInsertPoint(before, 1, 1), before)
+    assert.deepEqual(moveToInsertPoint(before, 1, 2), before)
+    assert.ok(sameOrder(before, moveToInsertPoint(before, 1, 1)))
+    assert.ok(!sameOrder(before, moveToInsertPoint(before, 1, 3)))
+  })
+
+  await test('筛选视图内重排不影响其他组的位置', () => {
+    const all = ['a', 'b', 'c', 'd', 'e']
+    const visible = ['b', 'd'] // 只看得到 b、d，把 d 拖到 b 前面
+    assert.deepEqual(applyVisibleOrder(all, ['d', 'b']), ['a', 'd', 'c', 'b', 'e'])
+    assert.deepEqual(applyVisibleOrder(all, visible), all, '顺序没变时全局也不变')
+    assert.deepEqual(applyVisibleOrder(all, ['x', 'b', 'd', 'b']), all, '未知 id、重复 id 被忽略')
+  })
+
+  await test('星标置顶时插入点夹在所属分段内', () => {
+    // 前 2 个是星标组：[星, 星, 普通, 普通]
+    assert.equal(clampPinnedIndex(0, 3, 2), 2, '普通组拖到顶上 → 只能落到星标段之后')
+
+    assert.equal(clampPinnedIndex(4, 0, 2), 2, '星标组拖到底 → 只能落到星标段末尾')
+    assert.equal(clampPinnedIndex(1, 0, 2), 1, '星标段内正常排序不受影响')
+    assert.equal(clampPinnedIndex(3, 3, 2), 3, '普通段内正常排序不受影响')
+    assert.equal(clampPinnedIndex(0, 3, 0), 0, '没有星标组时不限制')
+  })
+
+  await test('命中判定：上下段出排序线，中间窄带才合并', () => {
+    // 三张卡片，各 100px 高，zone = 0.3 → 排序带 30px，合并带 40px
+    const tops = [0, 110, 220]
+    const bottoms = [100, 210, 320]
+    const always = (): boolean => true
+    const hit = (clientY: number, canMerge: (i: number) => boolean = always): ReturnType<typeof hitTest> =>
+      hitTest({ tops, bottoms, clientY, zone: 0.3, canMerge })
+
+    assert.deepEqual(hit(10), { index: 0, mergeIndex: -1 }, '第一张上段 → 插到最前')
+    assert.deepEqual(hit(95), { index: 1, mergeIndex: -1 }, '第一张下段 → 插到第二张前')
+    assert.deepEqual(hit(105), { index: 1, mergeIndex: -1 }, '卡片之间的空隙 → 仍是插到第二张前')
+    assert.deepEqual(hit(50), { index: -1, mergeIndex: 0 }, '第一张中间 → 合并到第一张')
+    assert.deepEqual(hit(400), { index: 3, mergeIndex: -1 }, '最后一张下方 → 插到末尾')
+  })
+
+  await test('命中判定：自己与锁定组不参与合并，退化为排序', () => {
+    const tops = [0]
+    const bottoms = [100]
+    // 中间带（40~60）但不可合并 → 按上下半判断，60 属于下半 → 插到后面
+    assert.deepEqual(hitTest({ tops, bottoms, clientY: 60, zone: 0.3, canMerge: () => false }), { index: 1, mergeIndex: -1 })
+    assert.deepEqual(hitTest({ tops, bottoms, clientY: 45, zone: 0.3, canMerge: () => false }), { index: 0, mergeIndex: -1 })
+  })
+
+  await test('命中判定：标签拖拽整张卡片都是目标，间隙会吸附', () => {
+    const tops = [0, 110, 220]
+    const bottoms = [100, 210, 320]
+    const tabHit = (clientY: number): ReturnType<typeof hitTest> =>
+      hitTest({ tops, bottoms, clientY, zone: 0.3, mergeAnyBand: true, snap: 6, canMerge: () => true })
+
+    assert.deepEqual(tabHit(50), { index: -1, mergeIndex: 0 })
+    assert.deepEqual(tabHit(105), { index: -1, mergeIndex: 0 }, '间隙吸附到上一张，不会闪成「新建组」')
+    assert.deepEqual(tabHit(300), { index: -1, mergeIndex: 2 })
+    assert.deepEqual(tabHit(400), { index: -1, mergeIndex: -1 }, '离所有卡片都远 → 空白处，新建组')
   })
 
   console.log(`\n结果：${passed} 通过 / ${failed} 失败\n`)
