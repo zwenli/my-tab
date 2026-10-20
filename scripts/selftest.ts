@@ -295,6 +295,25 @@ const run = async (): Promise<void> => {
     assert.equal(back.groups[0]!.id, s.groups[0]!.id, '组 id 应原样保留')
   })
 
+  await test('待办标记往返：未完成 / 已完成都要落盘（刷新后不丢）', () => {
+    const s = emptyState('d')
+    const g = M.collectTabs(s, [tab('https://a.com', 'A'), tab('https://b.com', 'B')], { title: 'T' }).group!
+    // 「加为待办」创建的正是 done:false —— 它也必须能被写进文件
+    M.setItemTask(s, g.items[0]!.id, { done: false, completedAt: null })
+    M.setItemTask(s, g.items[1]!.id, { done: true, completedAt: 1700000000000 })
+
+    const files = stateToFiles(s, { format: LIBRARY_FORMAT })
+    const path = Object.keys(files).find((p) => p.startsWith('groups/'))!
+    assert.ok(files[path]!.includes('"task"'), '待办标记必须出现在组文件里')
+
+    const back = filesToState(files, { deviceId: 'd', settings: s.settings })
+    const items = back.groups[0]!.items
+    assert.deepEqual(items[0]!.task, { done: false, completedAt: null }, '未完成待办不应丢失')
+    assert.equal(items[1]!.task?.done, true, '已完成待办应保留')
+    assert.equal(items[1]!.task?.completedAt, 1700000000000, '完成时间应保留')
+    assert.equal(countOpenTasks(back), 1, '重读后未完成计数应为 1')
+  })
+
   await test('文件是排过版的、写给人看的 JSON', () => {
     const s = emptyState('d')
     M.collectTabs(s, [tab('https://a.com', 'A')], { title: 'T' })

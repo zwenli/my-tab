@@ -102,9 +102,21 @@ export const groupFileName = (g: Pick<Group, 'id' | 'title' | 'createdAt'>): str
 
 /* ------------------------------ 序列化 ------------------------------ */
 
+/**
+ * 待办标记 → 人可读对象。
+ *
+ * `done: false` 必须写出来：它虽然是「默认值」，但 **task 字段存在本身就是
+ * 「这是一条待办」的唯一证据**。若按省略默认值的原则把它丢掉，未完成的待办
+ * 会变成空对象 `{}` 进而被整段省略 → 文件里看不出任何痕迹 → 刷新页面重读时标记丢失。
+ */
+function serializeTask(t: TaskFlag): Record<string, unknown> {
+  const out: Record<string, unknown> = { done: t.done === true }
+  if (t.completedAt) out.completedAt = toIso(t.completedAt)
+  return out
+}
+
 /** TabItem → 人可读对象（省略默认值） */
 export function serializeItem(it: TabItem): Record<string, unknown> {
-  const task = it.task ? compact({ completedAt: it.task.completedAt ? toIso(it.task.completedAt) : '', done: it.task.done }) : null
   return compact({
     id: it.id,
     url: it.url,
@@ -112,7 +124,7 @@ export function serializeItem(it: TabItem): Record<string, unknown> {
     favIconUrl: it.favIconUrl,
     createdAt: toIso(it.createdAt),
     starred: it.starred,
-    task: task && Object.keys(task).length ? task : null,
+    task: it.task ? serializeTask(it.task) : null,
     note: it.note
   })
 }
