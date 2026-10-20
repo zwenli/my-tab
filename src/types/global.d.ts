@@ -19,9 +19,6 @@ declare global {
   var showDirectoryPicker: ((options?: DirectoryPickerOptions) => Promise<FileSystemDirectoryHandle>) | undefined
 }
 
-/** Vue SFC 模块声明（vue-tsc 已内置，这里兜底给纯 tsc 场景） */
-declare module '*.vue' {
-  import type { DefineComponent } from 'vue'
-  const component: DefineComponent<Record<string, unknown>, Record<string, unknown>, unknown>
-  export default component
-}
+/* 注：`*.vue` 的兜底声明放在 shims-vue.d.ts。
+ * 本文件是模块（有顶层 export），这里的 `declare module '*.vue'` 会退化成模块增强，
+ * 通配符不生效，纯 tsc 场景仍然报 TS2307。 */

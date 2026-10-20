@@ -1,0 +1,16 @@
+# 换行符统一：仓库内一律存 LF，检出也保持 LF。
+# 这样 Windows 上 core.autocrlf=true 也不会再把工作区文件转成 CRLF，
+# 避免每次提交都刷出 "LF will be replaced by CRLF" 的警告和无意义的 diff。
+* text=auto eol=lf
+
+# 二进制文件：禁止换行符转换、禁止文本 diff 与三方合并
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
