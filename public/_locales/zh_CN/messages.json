@@ -1,0 +1,30 @@
+{
+  "extName": {
+    "message": "MyTab — 标签页收纳盒",
+    "description": "扩展名称"
+  },
+  "extDescription": {
+    "message": "一键把打开过多的标签页折叠成一张可管理的列表，释放内存、减少杂乱；需要时再逐个或整体还原。",
+    "description": "扩展描述"
+  },
+  "extActionTitle": {
+    "message": "MyTab：收起标签页",
+    "description": "工具栏按钮标题"
+  },
+  "cmdCollectAll": {
+    "message": "收起当前窗口的全部标签",
+    "description": "快捷键说明"
+  },
+  "cmdCollectCurrent": {
+    "message": "只收起当前标签",
+    "description": "快捷键说明"
+  },
+  "cmdCollectOthers": {
+    "message": "收起除当前标签外的其他标签",
+    "description": "快捷键说明"
+  },
+  "cmdOpenList": {
+    "message": "打开 MyTab 列表页",
+    "description": "快捷键说明"
+  }
+}

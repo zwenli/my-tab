@@ -1,0 +1,59 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extName__",
+  "short_name": "MyTab",
+  "description": "__MSG_extDescription__",
+  "version": "1.0.0",
+  "default_locale": "zh_CN",
+  "minimum_chrome_version": "110",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "__MSG_extActionTitle__",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "assets/background.js",
+    "type": "module"
+  },
+  "options_page": "options.html",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "tabs",
+    "contextMenus",
+    "activeTab",
+    "scripting",
+    "downloads",
+    "favicon"
+  ],
+  "optional_permissions": ["tabGroups"],
+  "host_permissions": ["<all_urls>"],
+  "omnibox": { "keyword": "mt" },
+  "commands": {
+    "collect-all-tabs": {
+      "suggested_key": { "default": "Alt+Shift+O" },
+      "description": "__MSG_cmdCollectAll__"
+    },
+    "collect-current-tab": {
+      "suggested_key": { "default": "Alt+Shift+C" },
+      "description": "__MSG_cmdCollectCurrent__"
+    },
+    "collect-other-tabs": {
+      "description": "__MSG_cmdCollectOthers__"
+    },
+    "open-list": {
+      "suggested_key": { "default": "Alt+Shift+L" },
+      "description": "__MSG_cmdOpenList__"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "my-tab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MyTab — 一键收起标签页的浏览器扩展（Vue 3 + TypeScript + Composition API + Manifest V3）",
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch --mode development",
+    "build": "vue-tsc --noEmit -p tsconfig.app.json && vite build",
+    "build:only": "vite build",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
+    "icons": "tsx scripts/make-icons.ts",
+    "selftest": "tsx scripts/selftest.ts",
+    "demo": "tsx scripts/make-demo-page.ts && tsx scripts/make-ui-harness.ts",
+    "preview": "vite preview --port 4173 --strictPort",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "pinia": "^2.2.6",
+    "qrcode-generator": "^1.4.4",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "@types/node": "^22.10.2",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11",
+    "vue-tsc": "^2.1.10"
+  }
+}

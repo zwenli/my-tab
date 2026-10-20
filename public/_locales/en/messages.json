@@ -1,0 +1,30 @@
+{
+  "extName": {
+    "message": "MyTab — Tab Collector",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Collapse too many open tabs into one manageable list, free memory and cut the clutter. Restore one by one or all at once.",
+    "description": "Extension description"
+  },
+  "extActionTitle": {
+    "message": "MyTab: collect tabs",
+    "description": "Toolbar button title"
+  },
+  "cmdCollectAll": {
+    "message": "Collect all tabs in current window",
+    "description": "Command description"
+  },
+  "cmdCollectCurrent": {
+    "message": "Collect only the current tab",
+    "description": "Command description"
+  },
+  "cmdCollectOthers": {
+    "message": "Collect every tab except the current one",
+    "description": "Command description"
+  },
+  "cmdOpenList": {
+    "message": "Open the MyTab list page",
+    "description": "Command description"
+  }
+}

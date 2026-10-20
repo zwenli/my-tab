@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OneTab 功能说明书 · 逆向与实现准备</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --bg:#ffffff; --bg-soft:#f6f8fa; --bg-code:#f2f4f7;
+    --fg:#1f2328; --fg-soft:#57606a; --fg-mute:#8b949e;
+    --border:#d0d7de; --border-soft:#e6e9ed;
+    --accent:#0b6bcb; --accent-soft:#e7f0fb;
+    --red:#c9333a; --green:#1a7f37; --amber:#9a6700; --purple:#6e40c9;
+    --shadow:0 1px 3px rgba(27,31,36,.08), 0 8px 24px rgba(27,31,36,.06);
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0d1117; --bg-soft:#161b22; --bg-code:#1b2029;
+      --fg:#e6edf3; --fg-soft:#9aa4b2; --fg-mute:#6e7681;
+      --border:#30363d; --border-soft:#21262d;
+      --accent:#58a6ff; --accent-soft:#12233c;
+      --red:#ff7b72; --green:#3fb950; --amber:#d29922; --purple:#bc8cff;
+      --shadow:0 1px 3px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+    font-size:15.5px; line-height:1.72; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:0 24px 96px; display:grid; grid-template-columns:236px minmax(0,1fr); gap:44px}
+  header.hero{grid-column:1/-1; padding:52px 0 30px; border-bottom:1px solid var(--border-soft); margin-bottom:38px}
+  .kicker{font-size:12.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); font-weight:700}
+  h1{font-size:33px; line-height:1.25; margin:12px 0 10px; letter-spacing:-.01em}
+  .lede{color:var(--fg-soft); font-size:16.5px; max-width:74ch}
+  .meta{display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:20px; font-size:13px; color:var(--fg-mute)}
+  .meta b{color:var(--fg-soft); font-weight:600}
+  .pill{display:inline-block; padding:2px 9px; border-radius:99px; background:var(--accent-soft); color:var(--accent); font-size:12px; font-weight:600; border:1px solid transparent}
+
+  nav.toc{position:sticky; top:24px; align-self:start; height:calc(100vh - 48px); overflow:auto; padding-right:8px; font-size:13.5px}
+  nav.toc h4{margin:0 0 10px; font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--fg-mute)}
+  nav.toc a{display:block; color:var(--fg-soft); text-decoration:none; padding:4px 10px; border-left:2px solid transparent; border-radius:0 6px 6px 0}
+  nav.toc a:hover{color:var(--accent); background:var(--bg-soft)}
+  nav.toc a.sub{padding-left:22px; font-size:12.8px; color:var(--fg-mute)}
+
+  main{min-width:0}
+  section{margin:0 0 44px; scroll-margin-top:20px}
+  h2{font-size:23px; margin:46px 0 14px; padding-bottom:9px; border-bottom:1px solid var(--border-soft); letter-spacing:-.01em}
+  h2 .num{color:var(--accent); font-variant-numeric:tabular-nums; margin-right:10px}
+  h3{font-size:17.5px; margin:30px 0 10px}
+  h4{font-size:15px; margin:20px 0 8px; color:var(--fg-soft)}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0; padding-left:22px}
+  li{margin:5px 0}
+  code{font-family:var(--mono); font-size:.875em; background:var(--bg-code); padding:2px 6px; border-radius:5px; border:1px solid var(--border-soft)}
+  pre{background:var(--bg-code); border:1px solid var(--border-soft); border-radius:10px; padding:16px 18px; overflow:auto; font-size:13px; line-height:1.6}
+  pre code{background:none; border:none; padding:0; font-size:13px}
+  a{color:var(--accent)}
+  table{width:100%; border-collapse:collapse; margin:16px 0; font-size:14px; display:block; overflow-x:auto}
+  th,td{border:1px solid var(--border-soft); padding:9px 12px; text-align:left; vertical-align:top}
+  th{background:var(--bg-soft); font-weight:650; white-space:nowrap}
+  tbody tr:nth-child(even){background:color-mix(in srgb, var(--bg-soft) 55%, transparent)}
+  .card{background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:12px; padding:18px 20px; margin:18px 0}
+  .card h4{margin-top:0}
+  .callout{border-left:3px solid var(--accent); background:var(--bg-soft); border-radius:0 10px 10px 0; padding:12px 16px; margin:16px 0}
+  .callout.warn{border-left-color:var(--amber)}
+  .callout.danger{border-left-color:var(--red)}
+  .callout.ok{border-left-color:var(--green)}
+  .callout b{display:block; margin-bottom:2px}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  .kv{font-size:14px}
+  .kv div{display:flex; gap:10px; padding:5px 0; border-bottom:1px dashed var(--border-soft)}
+  .kv div span:first-child{color:var(--fg-mute); min-width:132px}
+  .tag{display:inline-block; font-size:11.5px; font-weight:700; padding:1px 8px; border-radius:6px; margin-right:6px; vertical-align:1px}
+  .t-p0{background:rgba(201,51,58,.14); color:var(--red)}
+  .t-p1{background:rgba(154,103,0,.16); color:var(--amber)}
+  .t-p2{background:rgba(110,64,201,.14); color:var(--purple)}
+  .t-new{background:rgba(26,127,55,.14); color:var(--green)}
+  .confirmed{color:var(--green); font-weight:700}
+  .inferred{color:var(--amber); font-weight:700}
+  .legend{font-size:12.5px; color:var(--fg-mute); margin-top:8px}
+  footer{grid-column:1/-1; margin-top:40px; padding-top:22px; border-top:1px solid var(--border-soft); color:var(--fg-mute); font-size:12.5px}
+  .anchor{color:var(--fg-mute); font-weight:400; font-size:.72em; text-decoration:none; margin-left:8px; opacity:0}
+  h2:hover .anchor,h3:hover .anchor{opacity:1}
+  @media (max-width:900px){
+    .wrap{grid-template-columns:1fr; gap:0}
+    nav.toc{display:none}
+    .grid2{grid-template-columns:1fr}
+    h1{font-size:27px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">功能说明书 · Functional Specification</div>
+  <h1>OneTab 浏览器扩展：功能梳理与逆向实现准备</h1>
+  <p class="lede">面向「my-tab」自研项目的可落地规格文档。梳理 OneTab 的产品定位、全部功能点、交互流程、数据模型、技术架构与权限模型，并给出逆向工程路线图与复刻实现建议。</p>
+  <div class="meta">
+    <span><b>研究对象：</b>OneTab（Chrome / Firefox / Edge / Safari）</span>
+    <span><b>扩展 ID：</b><code>chphlpgkkbolifaimnlloiipkdnihall</code></span>
+    <span><b>当前版本：</b>v2.24（2026-10-11）</span>
+    <span><b>整理日期：</b>2026-10-13</span>
+    <span class="pill">Manifest V3</span>
+    <span class="pill">2,000,000+ 用户</span>
+  </div>
+  <p class="legend">标记约定：<span class="confirmed">已证实</span> = 来自官方页面 / 商店 / 真实 manifest；<span class="inferred">待验证</span> = 基于证据的合理推断，需在解包后确认。</p>
+</header>
+
+<nav class="toc">
+  <h4>目录</h4>
+  <a href="#s0">0 · 文档说明</a>
+  <a href="#s1">1 · 产品概述</a>
+  <a href="#s2">2 · 核心概念与术语</a>
+  <a href="#s3">3 · 功能地图</a>
+  <a href="#s4">4 · 详细功能说明</a>
+  <a href="#s4-1" class="sub">4.1 收集 / 收起</a>
+  <a href="#s4-2" class="sub">4.2 查看与恢复</a>
+  <a href="#s4-3" class="sub">4.3 组织与整理</a>
+  <a href="#s4-4" class="sub">4.4 搜索</a>
+  <a href="#s4-5" class="sub">4.5 任务 / 星标 / 备注</a>
+  <a href="#s4-6" class="sub">4.6 快捷列表 Quick List</a>
+  <a href="#s4-7" class="sub">4.7 导出 / 导入 / 分享</a>
+  <a href="#s4-8" class="sub">4.8 同步与备份</a>
+  <a href="#s4-9" class="sub">4.9 设置项</a>
+  <a href="#s4-10" class="sub">4.10 界面与主题</a>
+  <a href="#s5">5 · 交互与用户流程</a>
+  <a href="#s6">6 · 界面结构</a>
+  <a href="#s7">7 · 数据模型（逆向重点）</a>
+  <a href="#s8">8 · 技术架构（逆向准备）</a>
+  <a href="#s9">9 · 权限与隐私模型</a>
+  <a href="#s10">10 · 边界与已知问题</a>
+  <a href="#s11">11 · 逆向工程路线图</a>
+  <a href="#s12">12 · my-tab 复刻实现建议</a>
+  <a href="#appendix">附录 A/B/C</a>
+</nav>
+
+<main>
+
+<!-- ================= 0 ================= -->
+<section id="s0">
+  <h2><span class="num">0</span>文档说明<a class="anchor" href="#s0">#</a></h2>
+  <h3>目的</h3>
+  <p>为「my-tab」项目提供一份<b>可直接驱动开发</b>的 OneTab 功能规格：既覆盖「做什么」（功能与交互），也覆盖「怎么做」（数据模型、API、权限、架构），并显式区分 <span class="confirmed">已证实事实</span> 与 <span class="inferred">待验证推断</span>，避免把营销话术当成工程结论。</p>
+
+  <h3>方法</h3>
+  <ol>
+    <li>抓取官网（zh-CN）、Help 页、Troubleshooting 页、Tab Recovery 页的官方原文；</li>
+    <li>核对 Chrome Web Store / Edge / Firefox 商店的版本、体积、语言数、评分；</li>
+    <li>从镜像站点获取到<b>真实 <code>manifest.json</code></b>（v1.84）与官方权限变更历史；</li>
+    <li>交叉比对第三方对比评测与用户评价，提取真实使用痛点。</li>
+  </ol>
+
+  <h3>本次未能完成的部分（重要）</h3>
+  <div class="callout warn">
+    <b>扩展包二进制未取回</b>
+    当前网络环境对本机直连 <code>clients2.googleusercontent.com</code>（CONNECT 502）及镜像站 <code>crx4chrome.com</code>（Cloudflare 挑战）均不可达，<b>未能下载并解包 .crx</b>。因此第 7 章数据模型中的<b>存储键名、序列化格式、加密细节为推断值</b>，第 11 章给出了取样与解包的具体方法。真实 manifest 已在附录 A 完整收录。
+  </div>
+
+  <h3>版本坐标（用于后续比对）</h3>
+  <div class="kv">
+    <div><span>最新版</span><span>v2.24，2026-10-11，体积 2.87 MB（chrome-stats 抓取于 2026-10-12）</span></div>
+    <div><span>商店展示版</span><span>v2.18，2026-07-05，2.5 MiB，48 种语言</span></div>
+    <div><span>v2 大版本</span><span>2025-09 起逐步推送，2026-03 全量；系一次<b>完全重写</b></span></div>
+    <div><span>v1 末版</span><span>v1.86（2024-06-11）</span></div>
+  </div>
+</section>
+
+<!-- ================= 1 ================= -->
+<section id="s1">
+  <h2><span class="num">1</span>产品概述<a class="anchor" href="#s1">#</a></h2>
+
+  <h3>1.1 一句话定位</h3>
+  <p>OneTab 是一个<b>零门槛的「标签页收纳器」</b>：点一下图标，把当前窗口所有标签页折叠成一张列表页并关闭它们，从而释放内存；需要时再个别或整体还原。</p>
+
+  <h3>1.2 价值主张</h3>
+  <ul>
+    <li><b>省内存</b>：官方宣称最多节省 95% 内存（示例 1981 MB → 99 MB）。原理是减少「活动标签页数量」，而非某种黑科技。</li>
+    <li><b>降杂乱</b>：把标签栏从「一墙 favicon」变成可检索、可组织的列表。</li>
+    <li><b>零成本 / 零注册</b>：免费、无需账号、默认纯本地存储。</li>
+    <li><b>抗丢失</b>：关闭 OneTab 页、重启浏览器/电脑、浏览器崩溃都不丢列表（数据落在扩展存储，不在页面里）。</li>
+  </ul>
+
+  <h3>1.3 目标用户</h3>
+  <p>重度多标签用户：研究者、开发者、内容消费者、多任务办公者。「先收起来，之后再处理」是核心心智模型。</p>
+
+  <h3>1.4 平台与商业模式</h3>
+  <table>
+    <thead><tr><th>维度</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr><td>平台</td><td>Chrome、Firefox、Edge、Safari 及更多 Chromium 浏览器</td></tr>
+      <tr><td>内核要求</td><td>Chrome 115+（2023-07）为下限；依赖 tab groups 与 MV3（Safari 上不支持文件夹/搜索/云同步等新功能）</td></tr>
+      <tr><td>开发者</td><td>OneTab Ltd（英国，Harrow）</td></tr>
+      <tr><td>商业模式</td><td>扩展本体<b>免费无上限</b>；<b>加密云同步 / 备份为付费能力</b>（官网无公开定价页，属新增未验证能力）</td></tr>
+      <tr><td>规模</td><td>Chrome 侧 200 万+ 用户，4.45 分（约 1.46 万评分）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>1.5 竞品坐标（决定 my-tab 的差异化空间）</h3>
+  <table>
+    <thead><tr><th>产品</th><th>思路</th><th>组织能力</th><th>跨设备</th><th>定价</th></tr></thead>
+    <tbody>
+      <tr><td><b>OneTab</b></td><td>一键折叠成列表</td><td>组 / 文件夹 / 搜索 / 星标 / 任务（v2 起）</td><td>付费云同步（E2E）</td><td>免费 + 付费同步</td></tr>
+      <tr><td>Toby</td><td>新标签页可视化工作台</td><td>Spaces + Collections（强）</td><td>免费账号即同步</td><td>免费 60 条 / $4.5 起</td></tr>
+      <tr><td>Workona</td><td>项目工作区</td><td>Workspace（最强）</td><td>是</td><td>免费有限 / ~$7</td></tr>
+      <tr><td>Amazing Tabs</td><td>可搜索卡片 + ⌘K</td><td>中（即时搜索为卖点）</td><td>是（登录后）</td><td>免费 100 条 / $2.9 起</td></tr>
+    </tbody>
+  </table>
+  <p class="legend">结论：OneTab 的护城河是「一键、零配置、纯本地、免费无限量」；弱点是「搜索/组织弱于后来者、曾多次发生数据丢失、无免费同步」。my-tab 的切入点是：<b>保留一键心智 + 提供免费/自托管同步 + 更强的检索与防丢失</b>。</p>
+</section>
+
+<!-- ================= 2 ================= -->
+<section id="s2">
+  <h2><span class="num">2</span>核心概念与术语<a class="anchor" href="#s2">#</a></h2>
+  <table>
+    <thead><tr><th>术语</th><th>英文</th><th>定义</th></tr></thead>
+    <tbody>
+      <tr><td>标签页条目</td><td>Tab / Tab item</td><td>一条被收藏的链接，含 URL、标题、favicon、时间戳。</td></tr>
+      <tr><td>标签组</td><td>Tab Group</td><td>一次「收起」操作产生的一组标签，是 OneTab 页上的基本卡片单位。</td></tr>
+      <tr><td>文件夹</td><td>Folder</td><td>v2 新增，可容纳多个标签组，形成两级层级。</td></tr>
+      <tr><td>快捷列表</td><td>Quick List</td><td>OneTab 页上独立的「固定/常用」列，可从图标弹窗直接访问。</td></tr>
+      <tr><td>星标</td><td>Star</td><td>把某个组置顶（按加星顺序排序）。</td></tr>
+      <tr><td>锁定</td><td>Lock</td><td>保护组不被误删；从锁定组还原的标签仍留在列表中。</td></tr>
+      <tr><td>任务</td><td>Task</td><td>条目的待办标记，再点一次标记完成。</td></tr>
+      <tr><td>备注</td><td>Notes</td><td>给条目/组的文字说明（官网「备注」能力）。</td></tr>
+      <tr><td>会话</td><td>Session</td><td>概念上等价于一次窗口收起的结果，OneTab 未将 Session 作为独立一级对象（与 Toby/Amazing Tabs 不同）。</td></tr>
+      <tr><td>分享为网页</td><td>Share as a web page</td><td>把某个组上传到服务端生成可分享链接（<b>唯一会外传数据的出口</b>）。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================= 3 ================= -->
+<section id="s3">
+  <h2><span class="num">3</span>功能地图（能力清单）<a class="anchor" href="#s3">#</a></h2>
+  <p>按功能域划分，并标注复刻优先级：<span class="tag t-p0">P0</span>必做核心 · <span class="tag t-p1">P1</span>体验必备 · <span class="tag t-p2">P2</span>增强 · <span class="tag t-new">v2</span>v2 新增。</p>
+  <table>
+    <thead><tr><th>功能域</th><th>能力</th><th>优先级</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="7">A 收集</td><td>一键收起当前窗口全部标签</td><td><span class="tag t-p0">P0</span></td></tr>
+      <tr><td>收起单标签 / 其他标签 / 左侧 / 右侧（右键菜单）</td><td><span class="tag t-p0">P0</span></td></tr>
+      <tr><td>仅在标签栏多选后收起选中项</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td>快捷键收起 / 打开</td><td><span class="tag t-p0">P0</span></td></tr>
+      <tr><td>固定标签（pinned）处理策略</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td>无痕/隐私窗口支持</td><td><span class="tag t-p2">P2</span></td></tr>
+      <tr><td>重复标签处理策略</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td rowspan="4">B 恢复</td><td>单条恢复</td><td><span class="tag t-p0">P0</span></td></tr>
+      <tr><td>整组恢复</td><td><span class="tag t-p0">P0</span></td></tr>
+      <tr><td>全部恢复</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td>恢复目标窗口 / 恢复后是否移除</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td rowspan="7">C 组织</td><td>组内条目拖拽排序</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td>拖到空白处新建组</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td>拖组入组 = 合并</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td>文件夹（两级层级）</td><td><span class="tag t-new">v2</span> <span class="tag t-p1">P1</span></td></tr>
+      <tr><td>组重命名</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td>星标置顶 / 锁定</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td>多选（tick）与批量操作</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td rowspan="2">D 检索</td><td>页面内搜索栏（<code>/</code> 聚焦）</td><td><span class="tag t-new">v2</span> <span class="tag t-p0">P0</span></td></tr>
+      <tr><td>地址栏关键词搜索（<code>11</code> + 空格）</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td rowspan="2">E 标记</td><td>任务 / 完成态</td><td><span class="tag t-new">v2</span> <span class="tag t-p2">P2</span></td></tr>
+      <tr><td>备注 / 星标</td><td><span class="tag t-new">v2</span> <span class="tag t-p2">P2</span></td></tr>
+      <tr><td>F 快捷列表</td><td>Quick List 独立栏 + 图标弹窗入口</td><td><span class="tag t-new">v2</span> <span class="tag t-p2">P2</span></td></tr>
+      <tr><td rowspan="4">G 数据流转</td><td>导出 / 导入（URL 列表）</td><td><span class="tag t-p0">P0</span></td></tr>
+      <tr><td>分享为网页（上传生成链接 + 二维码）</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td>复制链接到剪贴板</td><td><span class="tag t-p2">P2</span></td></tr>
+      <tr><td>加密云同步 / 备份（跨浏览器、E2E）</td><td><span class="tag t-p2">P2</span></td></tr>
+      <tr><td rowspan="3">H 设置</td><td>选项页（启动行为、恢复行为、固定标签、去重等）</td><td><span class="tag t-p0">P0</span></td></tr>
+      <tr><td>快捷键自定义</td><td><span class="tag t-p1">P1</span></td></tr>
+      <tr><td>深色模式</td><td><span class="tag t-p1">P1</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================= 4 ================= -->
+<section id="s4">
+  <h2><span class="num">4</span>详细功能说明<a class="anchor" href="#s4">#</a></h2>
+
+  <h3 id="s4-1">4.1 收集 / 收起（Collect）<a class="anchor" href="#s4-1">#</a></h3>
+  <p><b>主操作：点击工具栏图标 → 收起当前窗口全部标签。</b>用户点一下 OneTab 图标，扩展读取当前窗口所有标签的元数据，批量关闭它们，并把它们写成一个新标签组，同时打开 OneTab 列表页展示结果。</p>
+  <h4>触发入口（共 4 类）</h4>
+  <ul>
+    <li><b>工具栏图标</b>：默认直接执行「收起当前窗口」；若在选项中启用了弹窗，则图标改为打开弹窗（弹窗内含快捷列表与操作）。</li>
+    <li><b>页面右键菜单</b>：在网页内右键可展开 OneTab 菜单，支持「发送当前标签 / 所有标签 / 其他标签 / 左侧标签 / 右侧标签到 OneTab」等粒度。</li>
+    <li><b>标签栏多选</b>：先在浏览器标签栏按住 <code>Ctrl</code>/<code>⌘</code>/<code>Shift</code> 多选，再用右键菜单只把<b>选中</b>的标签发送到 OneTab。</li>
+    <li><b>键盘快捷键</b>：默认 <code>Alt+Shift+1</code>（Windows/Linux）、<code>Option+Shift+1</code>（Mac）打开 OneTab；另有「模拟点击图标」的快捷键可配置，用于把当前窗口全部标签送入。</li>
+  </ul>
+  <h4>策略选项（需在选项页配置）</h4>
+  <ul>
+    <li><b>固定标签</b>：是否连同 pinned 标签一起收起（默认通常保留固定标签）。</li>
+    <li><b>重复标签</b>：是否允许/自动去重。</li>
+    <li><b>无痕模式</b>：需在浏览器层面单独授权扩展在无痕/隐私窗口运行。</li>
+  </ul>
+  <div class="callout">
+    <b>实现要点（省内存的真实机制）</b>
+    真正省内存靠的是「<b>关闭</b>标签页」——标签页一旦关闭，其渲染进程即被系统回收。不要把 <code>chrome.tabs.discard()</code>（只是挂起渲染进程、标签仍在栏上）与 OneTab 的做法混为一谈；网上部分「深度解析」文章把 OneTab 描述为使用 <code>discard()</code>，与官方「转换为列表、标签不再打开」的描述不符，<span class="inferred">待解包验证</span>。
+  </div>
+  <h4>恢复语义</h4>
+  <p>收起后原标签被关闭；恢复时通过 <code>chrome.tabs.create()</code> 重新打开 URL。<b>不保证恢复页面状态</b>（滚动位置、表单内容、已登录会话内的临时状态），这是所有同类扩展共同受浏览器安全模型限制的边界。</p>
+
+  <h3 id="s4-2">4.2 查看与恢复（View &amp; Restore）<a class="anchor" href="#s4-2">#</a></h3>
+  <ul>
+    <li><b>OneTab 页面</b>：一个全页面列表，按组展示已保存标签；每组显示标签数量、标题、URL、favicon。</li>
+    <li><b>单条恢复</b>：点击某条标签即在新标签页打开它。</li>
+    <li><b>整组恢复</b>：点击组的「恢复」按钮，一次性打开该组全部标签。</li>
+    <li><b>全部恢复</b>：恢复所有组。</li>
+    <li><b>恢复后行为</b>：可配置「恢复后是否从列表移除」「恢复到当前窗口还是新窗口」。</li>
+    <li><b>锁定组的特殊语义</b>：从<b>锁定</b>组还原的标签<b>仍保留在 OneTab 列表中</b>（相当于「复制打开」而非「移动打开」）。</li>
+  </ul>
+
+  <h3 id="s4-3">4.3 组织与整理（Organize）<a class="anchor" href="#s4-3">#</a></h3>
+  <ul>
+    <li><b>拖拽排序</b>：拖动标签条目改变组内顺序。</li>
+    <li><b>拖到空白新建组</b>：把条目拖到列表空白区域即创建一个新组。</li>
+    <li><b>拖组入组合并</b>：把一个组拖到另一个组上，两组合并。</li>
+    <li><b>文件夹</b>（v2）：把组归档到文件夹中，形成「文件夹 → 组 → 标签」的层级组织。</li>
+    <li><b>重命名</b>：点击「More」→「Name the tab group」为组命名；v2 亦支持双击重命名。</li>
+    <li><b>星标置顶</b>：点击「More… → Start this tab group」加星，星标组固定置顶，多个星标组按加星顺序排列。</li>
+    <li><b>锁定</b>：点击「Lock this tab group」加锁图标，防止误删。</li>
+    <li><b>多选</b>：点击条目上的勾选图标多选，右键勾选图标可看到批量操作（批量删除、批量恢复、移动到组等）。</li>
+    <li><b>删除 / 清空</b>：删除单条、删组、清空列表（可在选项里配置「恢复后清空列表」）。</li>
+  </ul>
+
+  <h3 id="s4-4">4.4 搜索（Search）<a class="anchor" href="#s4-4">#</a></h3>
+  <ul>
+    <li><b>页面内搜索栏</b>（v2）：在 OneTab 页顶部输入关键词即时过滤已保存标签；按 <code>/</code> 可快速聚焦搜索框。</li>
+    <li><b>地址栏搜索</b>：即使不在 OneTab 页，也可在浏览器地址栏输入 <code>11</code> + 空格 + 关键词，直接在地址栏检索 OneTab 列表（基于 omnibox 关键词）。</li>
+    <li>搜索维度：标题、URL（<span class="inferred">待确认是否含备注/文件夹名</span>）。</li>
+  </ul>
+
+  <h3 id="s4-5">4.5 任务 / 星标 / 备注（v2）<a class="anchor" href="#s4-5">#</a></h3>
+  <ul>
+    <li><b>星标</b>：标记重要条目/组。</li>
+    <li><b>任务</b>：给条目加待办标记，再点一次标记为完成，用于「这批标签还没处理完」的场景。</li>
+    <li><b>备注</b>：为内容添加文字说明，帮助日后回忆「为什么当初留着这些标签」。</li>
+  </ul>
+
+  <h3 id="s4-6">4.6 快捷列表 Quick List（v2）<a class="anchor" href="#s4-6">#</a></h3>
+  <p>OneTab 页上有一个独立的「快捷列表」列。把重要条目拖入该列即可随时访问；若启用了弹窗，点击工具栏图标即可查看快捷列表内容。这是对「高频使用项」的一层轻量置顶。</p>
+
+  <h3 id="s4-7">4.7 导出 / 导入 / 分享<a class="anchor" href="#s4-7">#</a></h3>
+  <ul>
+    <li><b>导出</b>：把标签列表导出为 URL 文本清单，可保存/迁移。</li>
+    <li><b>导入</b>：把 URL 清单（或分享页内容）导入回来，用于跨电脑迁移。</li>
+    <li><b>分享为网页</b>：把某个组上传到 <code>www.one-tab.com</code> 生成公开网页链接，并生成二维码，方便跨设备/跨人获取。<b>这是唯一会把数据上传到服务端的功能</b>。</li>
+    <li><b>复制链接</b>：从组的下拉菜单复制链接到剪贴板。</li>
+    <li><b>无扩展时的恢复</b>：官方提供 <code>datadump-1.1.zip</code>（一个临时解包扩展），在无法升级的旧浏览器中读取并导出旧数据，再在新环境导入。</li>
+  </ul>
+
+  <h3 id="s4-8">4.8 同步与备份<a class="anchor" href="#s4-8">#</a></h3>
+
+  <h4>4.8.1 OneTab 的做法（参考，v2 付费）</h4>
+  <ul>
+    <li><b>端到端加密</b>：宣称使用 AES-256 高强度加密，密钥只在用户手中，开发者不可见备份内容。</li>
+    <li><b>跨浏览器同步</b>：在 Chrome / Firefox / Edge 之间同步；一处改动，其他设备即时可见。</li>
+    <li><b>免费 vs 付费</b>：免费扩展仍是<b>纯本地存储</b>；云备份/同步为<b>付费订阅</b>（官网无公开定价页）。</li>
+  </ul>
+  <div class="callout warn"><b>待验证</b>同步是 v2 的新能力，官方站点措辞为「Coming soon / 即将推出」与「已推出」并存；第三方评测普遍标注其为「未经证实 / 无公开定价」。</div>
+
+  <h4>4.8.2 my-tab 方案：基于 OneDrive 的文件级同步与备份（设计决策）</h4>
+  <div class="callout ok">
+    <b>决策</b><b>不</b>自建云端、<b>不</b>做 E2E 加密、<b>不</b>接 Microsoft Graph API。把 <b>OneDrive 当作纯粹的「文件搬运工」</b>：扩展只负责把整库导出一个 JSON 快照文件、以及从该文件读取恢复，跨设备同步完全交给 OneDrive 客户端完成。简单、可审计、零服务端成本、无需账号对接。
+  </div>
+  <p><b>职责边界</b>：my-tab 只做「读写一个本地 JSON 文件」；OneDrive 负责「把这个文件同步到云端和其他设备」。两者通过文件系统解耦。</p>
+
+  <h5 style="font-weight:650;margin:18px 0 6px">数据契约（快照文件）</h5>
+  <pre><code>{
+  "format": "my-tab-backup",     // 固定标识，用于校验
+  "schemaVersion": 1,            // 与 Store.version 对应，供迁移
+  "deviceId": "&lt;uuid&gt;",           // 标记来源设备，便于冲突判断
+  "exportedAt": 1730000000000,   // 导出时间戳（毫秒）
+  "store": { /* 第 7.3 节的 Store：folders / groups / quickList / settings */ }
+}</code></pre>
+  <p>文件名建议固定为 <code>my-tab-backup.json</code>；如需历史快照，另存 <code>my-tab-backup.&lt;ISO时间戳&gt;.json</code> 并保留最近 N 份。</p>
+
+  <h5 style="font-weight:650;margin:18px 0 6px">两条落地路径</h5>
+  <table>
+    <thead><tr><th>路径</th><th>做法</th><th>体验</th><th>兼容性</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>A · 目录句柄（推荐）</b></td>
+        <td>用户在选项中点「选择 OneDrive 备份文件夹」→ File System Access API 的 <code>showDirectoryPicker()</code> 取得目录句柄 → 句柄存 IndexedDB → 之后可<b>静默读写</b>该目录下的快照文件</td>
+        <td>一次授权，长期自动备份</td>
+        <td>Chrome / Edge 支持；Firefox、Safari 不支持</td>
+      </tr>
+      <tr>
+        <td><b>B · 下载目录兜底</b></td>
+        <td>用 <code>chrome.downloads</code> 把快照写到默认下载目录（如 <code>my-tab/backup.json</code>）；恢复时用 <code>&lt;input type=file&gt;</code> 选回文件。用户把 OneDrive 指向该目录或其子目录</td>
+        <td>需手动点导出/导入，无自动</td>
+        <td>全平台可用</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="legend">策略：优先用 A，检测到 API 不可用时自动降级到 B。</p>
+
+  <h5 style="font-weight:650;margin:18px 0 6px">触发时机与冲突处理</h5>
+  <ul>
+    <li><b>触发</b>：① 每次收起/组织后（防抖）自动备份；② 浏览器启动时自动读取合并；③ 选项页提供「立即备份 / 立即恢复」按钮。</li>
+    <li><b>合并策略</b>：按 <code>id</code>（uuid）做并集，同 id 以 <code>updatedAt</code> 较新者为准（last-write-wins）；删除用软删除标记（<code>deletedAt</code>）传递，避免「A 删除、B 合并后又复活」。</li>
+    <li><b>冲突</b>：写入前先读取当前文件内容并合并，再落盘，减少覆盖丢失；时间戳快照可作手工回滚点。</li>
+    <li><b>防呆</b>：写文件采用「先写临时文件再替换」，避免 OneDrive 正在上行时读到半截文件。</li>
+  </ul>
+
+  <h5 style="font-weight:650;margin:18px 0 6px">明确不做的（保持简单）</h5>
+  <ul>
+    <li>❌ Microsoft Graph API / OAuth 登录（需 Azure 应用注册、client id/secret，复杂度高，收益低）。</li>
+    <li>❌ 端到端加密（快照为明文 JSON；后续如需，可作为可选项加口令加密，不默认开启）。</li>
+    <li>❌ 实时推送同步（改为「变更触发 + 启动拉取 + 手动」三种时机）。</li>
+    <li>❌ 自建服务端。</li>
+  </ul>
+  <div class="callout"><b>后续可选升级</b>若日后确需实时/免配置同步，再评估 Graph API 或托管后端；当前不做，避免过度设计。</div>
+
+  <h3 id="s4-9">4.9 设置项（Options）<a class="anchor" href="#s4-9">#</a></h3>
+  <p>选项页（<code>options.html</code>，在独立标签页打开，见真实 manifest）至少包含以下可配置项：</p>
+  <ul>
+    <li>启动行为：是否在浏览器启动时打开 OneTab 页。</li>
+    <li>固定标签：是否把 pinned 标签一并收起。</li>
+    <li>重复标签：是否允许重复 / 自动去重。</li>
+    <li>恢复行为：恢复到当前窗口还是新窗口；恢复后是否从列表移除；是否清空列表。</li>
+    <li>弹窗：是否启用工具栏图标弹窗（影响图标点击行为）。</li>
+    <li>快捷键：查看/跳转到快捷键设置入口。</li>
+    <li>安全/隐私相关项：如是否允许无痕窗口（需浏览器层面配合）。</li>
+    <li>v2 新增：语言、主题（深色模式）、保存模式、备份选项、回收站与重复链接管理、安全设置等（<span class="inferred">具体条目待解包确认</span>）。</li>
+    <li><b>my-tab 备份相关设置</b>（见 4.8.2）：备份目录（OneDrive 文件夹）、自动备份开关与频率、启动时自动合并、保留快照份数、「立即备份 / 立即恢复」入口。</li>
+  </ul>
+
+  <h3 id="s4-10">4.10 界面与主题<a class="anchor" href="#s4-10">#</a></h3>
+  <ul>
+    <li><b>深色模式</b>：官方明确提供深色主题。</li>
+    <li><b>v2 重设计</b>：界面较 v1 更「应用化」，但也因此被大量老用户吐槽（见第 10 章）。my-tab 应保留极简气质。</li>
+    <li><b>多语言</b>：48 种（v2.18）；v1 早期为 30 种。</li>
+  </ul>
+</section>
+
+<!-- ================= 5 ================= -->
+<section id="s5">
+  <h2><span class="num">5</span>交互与用户流程<a class="anchor" href="#s5">#</a></h2>
+
+  <h3>5.1 核心流程：收起（Save / Collapse）</h3>
+  <pre><code>用户点击图标 / 快捷键 / 右键菜单
+      │
+      ▼
+查询当前窗口标签  chrome.tabs.query({currentWindow:true})
+      │
+      ▼
+按策略过滤（排除固定标签? /去重? /排除 OneTab 自身页? / 按多选子集）
+      │
+      ▼
+记录元数据 { url, title, favIconUrl, pinned, lastAccessed, windowId, index }
+      │
+      ▼
+写入存储 chrome.storage.local  ← 先落库，后关标签（防丢关键点）
+      │
+      ▼
+批量关闭标签  chrome.tabs.remove([...tabIds])
+      │
+      ▼
+打开 / 聚焦 OneTab 列表页，展示新组</code></pre>
+  <div class="callout ok"><b>顺序很重要</b>「先持久化、再关闭」是防数据丢失的核心。若反过来（先关再写），在写入前崩溃即会丢失全部标签。</div>
+
+  <h3>5.2 核心流程：恢复（Restore）</h3>
+  <pre><code>用户点击条目 / 组的「恢复」
+      │
+      ├─ 单条：chrome.tabs.create({url, active:false})
+      ├─ 整组：对组内每条依次 create（可控制是否新窗口）
+      └─ 全部：遍历所有组
+      │
+      ▼
+按设置决定是否从列表中移除（锁定组不移除）
+      │
+      ▼
+写回存储并刷新 UI（用事件广播通知其它页面）</code></pre>
+
+  <h3>5.3 关键竞态与边界</h3>
+  <ul>
+    <li><b>并发收起</b>：多窗口同时触发时需串行化写入，避免丢更新（建议用「读-改-写」+ 简单锁，或集中由 service worker 串行处理）。</li>
+    <li><b>MV3 service worker 生命周期</b>：后台可能随时休眠，所有持久状态必须落 <code>chrome.storage</code>，不能只放内存变量。</li>
+    <li><b>页面对存储变化的响应</b>：多标签同时打开 OneTab 页时，需通过 <code>chrome.storage.onChanged</code> 或 <code>runtime.sendMessage</code> 同步 UI。</li>
+    <li><b>关闭最后一个标签</b>：若窗口仅剩 OneTab 页并再次收起，需避免把自己也收进去（应排除扩展自身页面）。</li>
+    <li><b>恢复顺序</b>：整组恢复时保持原 <code>index</code> 顺序，避免打乱用户预期。</li>
+  </ul>
+</section>
+
+<!-- ================= 6 ================= -->
+<section id="s6">
+  <h2><span class="num">6</span>界面结构<a class="anchor" href="#s6">#</a></h2>
+  <table>
+    <thead><tr><th>界面</th><th>载体</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td>列表页</td><td>扩展页面（在浏览器标签中打开）</td><td>展示全部组/文件夹/快捷列表；搜索、拖拽、批量操作、恢复、分享</td></tr>
+      <tr><td>选项页 <code>options.html</code></td><td>独立标签页（<code>open_in_tab:true</code>）</td><td>配置行为、快捷键、主题、备份等</td></tr>
+      <tr><td>工具栏图标</td><td><code>action</code></td><td>默认 = 收起；可配置为打开弹窗</td></tr>
+      <tr><td>弹窗（可选）</td><td>popup</td><td>展示快捷列表与常用操作</td></tr>
+      <tr><td>右键菜单</td><td><code>contextMenus</code></td><td>按位置范围发送标签到 OneTab</td></tr>
+      <tr><td>地址栏关键词</td><td>omnibox（<code>11</code> + 空格）</td><td>不用打开页面即可搜索列表</td></tr>
+      <tr><td>分享页</td><td>服务端网页（one-tab.com）</td><td>展示分享出去的标签组 + 二维码</td></tr>
+    </tbody>
+  </table>
+  <p class="legend">说明：真实 manifest（v1.84）中 <code>action</code> 只定义了图标、<b>未定义 <code>default_popup</code></b>，印证「默认点击即收起」；popup 属可选的 v2 能力。</p>
+</section>
+
+<!-- ================= 7 ================= -->
+<section id="s7">
+  <h2><span class="num">7</span>数据模型（逆向重点）<a class="anchor" href="#s7-7">#</a></h2>
+  <div class="callout warn"><b>本章为推断模型</b>受限于未能解包二进制，以下实体/字段为<b>基于官方行为与 MV3 惯例的合理建模</b>，用于指导实现；<b>真实键名与结构需按第 11 章方法解包后校正</b>。</div>
+
+  <h3>7.1 存储位置<span class="confirmed">已证实</span></h3>
+  <ul>
+    <li>官方故障排查原文：「OneTab data is stored in <b>your browser's internal database</b>」→ 对应扩展的持久化存储（<code>chrome.storage.local</code>，底层为浏览器 profile 目录下的 LevelDB）。</li>
+    <li>manifest 同时申请 <code>storage</code> + <code>unlimitedStorage</code>，说明数据量可达很大且需突破默认配额。</li>
+    <li>v2 提示「使用了与 v1 不同的浏览器数据库」，说明 v2 更换了存储后端（v1 可能为 <code>localStorage</code>，v2 为 <code>chrome.storage.local</code>/IndexedDB，<span class="inferred">待验证</span>）。</li>
+    <li>数据随浏览器 profile 走：卸载扩展 / 重置 profile 会删除数据（官方反复警告）。</li>
+  </ul>
+
+  <h3>7.2 实体关系（推断）</h3>
+  <pre><code>Folder 1 ──── * TabGroup 1 ──── * TabItem
+   │                 │
+   │                 ├─ name, star, locked, createdAt
+   │                 └─ note?
+   │
+QuickList ── 引用若干 TabItem（跨组的置顶集合）
+
+Settings ── 单例配置对象
+Trash?  ── 回收站（v2 提及 trash 管理，待验证）</code></pre>
+
+  <h3>7.3 字段草案（用于 my-tab 起步，字段名可控）</h3>
+  <pre><code>TabItem {
+  id:        string;          // 稳定唯一 id（建议 uuid）
+  url:       string;          // 必填
+  title:     string;
+  favIconUrl:string | null;   // 由 favicon 权限/服务提供
+  createdAt: number;          // 毫秒时间戳
+  pinned:    boolean;         // 原标签是否固定
+  starred?:  boolean;
+  task?:     'open' | 'done';
+  note?:     string;
+  origin?:   { windowId:number; index:number; lastAccessed?:number };
+}
+
+TabGroup {
+  id:        string;
+  name?:     string;          // 用户命名
+  folderId?: string | null;
+  starred:   boolean;
+  locked:    boolean;
+  createdAt: number;
+  tabs:      TabItem[];
+}
+
+Folder { id:string; name:string; order:number; }
+Settings { /* 见 4.9 */ }
+Store { version:number; folders:Folder[]; groups:TabGroup[]; quickList:string[]; settings:Settings }</code></pre>
+
+  <h3>7.4 序列化 / 压缩 / 加密<span class="inferred">待验证</span></h3>
+  <ul>
+    <li>本地存储：很可能直接以 JSON 结构存入 <code>chrome.storage.local</code>（必要时按组切分键值以规避单值体积）。</li>
+    <li>云同步：宣称 AES-256 端到端加密，密钥派生自用户口令；同步后端域名证据为 <code>https://www.one-tab.com/*</code>（见权限沿革 2025-09-24）。</li>
+    <li>部分第三方克隆实现使用 LZ-string 压缩 + AES-GCM 加密（可作为参考技术选型）。</li>
+    <li><b>my-tab 决策</b>（见 4.8.2）：<b>不做端到端加密</b>。本地与 OneDrive 快照文件均为<b>明文 JSON</b>；如快照体积较大，可选用 LZ-string 压缩（仅降体积，不涉安全）。数据保密性由 OneDrive 账号自身的安全机制承担。</li>
+  </ul>
+</section>
+
+<!-- ================= 8 ================= -->
+<section id="s8">
+  <h2><span class="num">8</span>技术架构（逆向准备）<a class="anchor" href="#s8">#</a></h2>
+
+  <h3>8.1 真实 manifest 解读（v1.84）<span class="confirmed">已证实</span></h3>
+  <table>
+    <thead><tr><th>字段</th><th>值 / 含义</th></tr></thead>
+    <tbody>
+      <tr><td><code>manifest_version</code></td><td>3（MV3）</td></tr>
+      <tr><td><code>background.service_worker</code></td><td><code>ext-onetab-concatenated-sources-background.js</code> —— 命名暴露其构建方式：<b>把多个源文件拼接成单一后台脚本</b></td></tr>
+      <tr><td><code>options_ui</code></td><td><code>options.html</code>，<code>open_in_tab:true</code></td></tr>
+      <tr><td><code>commands</code></td><td><code>display-onetab</code>（默认 <code>Alt+Shift+1</code>）、<code>send-current-tab-to-onetab</code></td></tr>
+      <tr><td><code>action</code></td><td>仅图标（19/38），<b>无 default_popup</b> → 默认点击即收起</td></tr>
+      <tr><td><code>permissions</code></td><td><code>favicon, unlimitedStorage, storage, activeTab, scripting, tabs, contextMenus</code></td></tr>
+      <tr><td><code>optional_permissions</code></td><td><code>tabGroups</code></td></tr>
+      <tr><td>CSP <code>img-src</code></td><td>允许 <code>https://t2.gstatic.com</code> → 用 Google 服务生成域名图标（与官网「图标由 Google 生成」一致）</td></tr>
+      <tr><td><code>key</code></td><td>base64 公钥，决定固定扩展 ID <code>chphlpgkkbolifaimnlloiipkdnihall</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.2 组件与数据流</h3>
+  <pre><code>┌──────────────┐   action/命令/右键    ┌───────────────────────────┐
+│  工具栏图标   │ ───────────────────▶ │  Background Service Worker │
+│  右键菜单     │                      │  · 收/恢复 编排            │
+│  快捷键       │                      │  · contextMenus 构建       │
+└──────────────┘                      │  · omnibox(11) 搜索        │
+                                      │  · storage 读写(唯一权威)  │
+┌──────────────┐   runtime message    └───────────┬───────────────┘
+│ 列表页/弹窗   │ ◀──────────────────────────────▶ │
+│  options.html│   storage.onChanged               │
+└──────────────┘                                   ▼
+                                      chrome.storage.local（本地库）
+                                                   │
+                                        (付费/E2E 加密) 云同步
+                                                   ▼
+                                      www.one-tab.com / 分享页服务</code></pre>
+
+  <h3>8.3 依赖的 Chrome API 清单</h3>
+  <table>
+    <thead><tr><th>API</th><th>用途</th><th>权限</th></tr></thead>
+    <tbody>
+      <tr><td><code>chrome.tabs</code></td><td>query / create / remove / update（收起与恢复的核心）</td><td><code>tabs</code></td></tr>
+      <tr><td><code>chrome.tabGroups</code></td><td>浏览器原生标签组读写（可选）</td><td><code>tabGroups</code>(optional)</td></tr>
+      <tr><td><code>chrome.storage</code> (+<code>unlimitedStorage</code>)</td><td>本地持久化</td><td><code>storage</code></td></tr>
+      <tr><td><code>chrome.contextMenus</code></td><td>页面/标签右键菜单</td><td><code>contextMenus</code></td></tr>
+      <tr><td><code>chrome.commands</code></td><td>键盘快捷键</td><td>commands（无需额外权限）</td></tr>
+      <tr><td><code>chrome.scripting</code> + <code>activeTab</code></td><td>按需注入（可能用于读取页面信息/触发收藏）</td><td><code>scripting</code> <code>activeTab</code></td></tr>
+      <tr><td><code>chrome.favicon</code></td><td>获取站点图标</td><td><code>favicon</code></td></tr>
+      <tr><td><code>chrome.omnibox</code></td><td>地址栏 <code>11</code> 关键词搜索</td><td>omnibox（无需额外声明）</td></tr>
+      <tr><td><code>chrome.readingList</code> / <code>chrome.bookmarks</code></td><td>v2 可选集成（权限沿革 2025-09-24 新增，需用户授权）</td><td>optional</td></tr>
+      <tr><td><code>chrome.alarms</code> / <code>chrome.identity</code> / <code>chrome.notifications</code></td><td>同步/备份相关（<span class="inferred">待验证</span>）</td><td>视实现</td></tr>
+      <tr><td><code>chrome.downloads</code> <span class="tag t-new">my-tab</span></td><td>把快照文件导出到下载目录（OneDrive 兜底路径）</td><td><code>downloads</code></td></tr>
+      <tr><td>File System Access API <span class="tag t-new">my-tab</span></td><td>选择 OneDrive 备份目录并静默读写快照文件</td><td>Web 标准，无需扩展权限（由用户手势授权目录句柄）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.4 网络端点</h3>
+  <ul>
+    <li><code>https://clients2.google.com/service/update2/crx</code> —— 扩展更新（<code>update_url</code>）。</li>
+    <li><code>https://t2.gstatic.com</code> —— 域名 favicon 图源（CSP 白名单）。</li>
+    <li><code>https://www.one-tab.com/*</code> —— 分享为网页 / v2 云同步后端（可选主机权限证据）。</li>
+  </ul>
+
+  <h3>8.5 MV2 → MV3 迁移痕迹</h3>
+  <p>v1.18（MV2 时代）权限为 <code>tabs, &lt;all_urls&gt;, webRequest, webRequestBlocking, contextMenus</code>；1.58→1.61 改用 <code>scripting</code> + <code>favicon</code> 并移除 <code>chrome://favicon/</code>；1.69→1.72 增加可选 <code>tabGroups</code>。可据此判断其历史演进与踩坑点。</p>
+</section>
+
+<!-- ================= 9 ================= -->
+<section id="s9">
+  <h2><span class="num">9</span>权限与隐私模型<a class="anchor" href="#s9">#</a></h2>
+
+  <h3>9.1 权限逐项解读（v2.x 当前）</h3>
+  <table>
+    <thead><tr><th>权限</th><th>用途</th><th>风险</th></tr></thead>
+    <tbody>
+      <tr><td><code>tabs</code></td><td>读取所有标签的 url/title/favicon，才能收纳与恢复</td><td>可感知浏览习惯（官方声明不外传）</td></tr>
+      <tr><td><code>storage</code></td><td>保存列表与设置</td><td>低</td></tr>
+      <tr><td><code>unlimitedStorage</code></td><td>突破 5MB 配额，容纳海量标签</td><td>低</td></tr>
+      <tr><td><code>contextMenus</code></td><td>右键菜单入口</td><td>低</td></tr>
+      <tr><td><code>activeTab</code></td><td>仅在用户主动操作时临时访问当前页</td><td>低（比 <code>&lt;all_urls&gt;</code> 收敛）</td></tr>
+      <tr><td><code>scripting</code></td><td>按需注入脚本</td><td>中</td></tr>
+      <tr><td><code>favicon</code></td><td>生成域名图标</td><td>低</td></tr>
+      <tr><td>可选 <code>tabGroups</code></td><td>与浏览器原生标签组互操作</td><td>低（需用户授权）</td></tr>
+      <tr><td>可选 host <code>https://www.one-tab.com/*</code></td><td>分享 / 云同步</td><td>仅访问自家域名</td></tr>
+      <tr><td>可选 <code>readingList</code> / <code>bookmarks</code></td><td>v2 集成</td><td>中（需用户授权）</td></tr>
+    </tbody>
+  </table>
+  <p class="legend">第三方安全评估：<b>「中等风险影响 / 极低风险可能性」</b>——即权限较敏感（能读标签），但发布者信誉良好。</p>
+
+  <h3>9.2 隐私承诺（官方原文要点）</h3>
+  <ul>
+    <li>标签 URL <b>绝不传输</b>给 OneTab 开发者或任何第三方。</li>
+    <li>域名图标由 Google 生成（<code>t2.gstatic.com</code>）。</li>
+    <li><b>唯一例外</b>：用户主动点击「分享为网页」时，把该组上传为网页。</li>
+    <li>商店隐私声明：开发者「<b>不会收集或使用你的数据</b>」，不出售给第三方。</li>
+  </ul>
+  <div class="callout ok"><b>对 my-tab 的启示</b>「本地优先 + 唯一明确出口」是 OneTab 获得信任的关键叙事。my-tab 应默认纯本地，任何外传都必须显式、可审计。</div>
+</section>
+
+<!-- ================= 10 ================= -->
+<section id="s10">
+  <h2><span class="num">10</span>边界与已知问题<a class="anchor" href="#s10">#</a></h2>
+
+  <h3>10.1 数据丢失场景（官方故障排查页列举）</h3>
+  <table>
+    <thead><tr><th>原因</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>卸载 / 重装扩展</td><td>浏览器会删除扩展数据；官方反复警告不要用重装来「修复」问题</td></tr>
+      <tr><td>第三方清理软件</td><td>BleachBit、Advanced SystemCare 等会破坏/删除浏览器内部数据库</td></tr>
+      <tr><td>Firefox「刷新」</td><td>误点会把 Firefox 重置为默认，删除 OneTab 数据</td></tr>
+      <tr><td>磁盘空间不足</td><td>写入失败会导致数据库损坏或被删</td></tr>
+      <tr><td>崩溃 / 硬件故障</td><td>写入过程中崩溃可能造成损坏</td></tr>
+      <tr><td>浏览器 profile 切换 / 重置</td><td>不同 profile 相互独立，数据不共享</td></tr>
+    </tbody>
+  </table>
+  <p>官方给用户的建议：<b>定期导出</b>，或使用云备份/同步。<span class="legend">用户评价中「更新导致数据消失」是最常见的差评点之一 —— my-tab 必须把「迁移/升级不丢数据」当作一等公民。</span></p>
+
+  <h3>10.2 兼容性与性能</h3>
+  <ul>
+    <li>需 Chrome 115+；老版本 Chromebook 不再兼容。</li>
+    <li>Safari 上不支持文件夹/搜索/云同步等新功能（浏览器限制）。</li>
+    <li>第三方 Safari 扩展可能干扰加载。</li>
+    <li>重站点/非 Chromium 浏览器存在性能问题（后台主线程阻塞），标签数千条时会变慢。</li>
+  </ul>
+
+  <h3>10.3 功能缺口（用户呼声）</h3>
+  <ul>
+    <li>缺少「整组保存/恢复」与「保留文件夹层级状态」。</li>
+    <li>v2 的 UI 改版引发老用户不满，许多人偏好 v1 的极简界面。</li>
+    <li>同步能力未明确定价与可靠性。</li>
+  </ul>
+</section>
+
+<!-- ================= 11 ================= -->
+<section id="s11">
+  <h2><span class="num">11</span>逆向工程路线图<a class="anchor" href="#s11">#</a></h2>
+  <p>目标：拿到 OneTab 的<b>真实实现细节</b>（存储键、结构、消息协议、同步端点），校正第 7 章的推断。以下是可执行步骤。</p>
+
+  <h3>11.1 获取扩展包（.crx）</h3>
+  <p>官方更新清单直链（<b>推荐，需可直连 Google 的网络环境</b>）：</p>
+  <pre><code># 通过 update2 服务解析 Latest CRX（会自动 302 到 googleusercontent）
+BASE='https://clients2.google.com/service/update2/crx'
+PARAMS='response=redirect&os=win&arch=x86-64&os_arch=x86-64&prod=chromecrx&prodchannel=unknown&prodversion=120.0.0.0&acceptformat=crx2,crx3'
+curl -sSL "$BASE?$PARAMS&x=id%3Dchphlpgkkbolifaimnlloiipkdnihall%26uc" -o onetab.crx
+
+# 或从第三方镜像站（注意可能有 Cloudflare 挑战 / 版本滞后）
+#   crx4chrome.com / ilovechrome.com / chrome-stats.com 等</code></pre>
+  <div class="callout warn"><b>本次环境限制</b>直连 <code>clients2.googleusercontent.com</code> 被网络代理拒绝（CONNECT 502）；<code>crx4chrome.com</code> 镜像返回 Cloudflare 挑战页。请在可直连 Google 的机器上执行上述命令，或使用浏览器手动下载。</div>
+  <p><b>备用方案</b>：在本机 Chrome 安装 OneTab 后，从 <code>chrome://version</code> 找到 Profile 路径，扩展解包目录位于<br>
+  <code>&lt;Profile&gt;\Extensions\chphlpgkkbolifaimnlloiipkdnihall\&lt;version&gt;\</code>（Chrome 会解压出可直接阅读的源码文件）。这是<b>最省事的逆向入口</b>。</p>
+
+  <h3>11.2 解包与静态分析</h3>
+  <pre><code># CRX 去掉头部后即为 ZIP
+python -c "import sys;d=open('onetab.crx','rb').read();i=d.find(b'PK\x03\x04');open('onetab.zip','wb').write(d[i:])"
+unzip -o onetab.zip -d onetab_unpacked
+
+# 重点文件
+#   manifest.json                        权限/入口/命令
+#   ext-onetab-concatenated-sources-*.js 后台逻辑（拼接产物，读起来连续）
+#   onetab.html / *.js                   列表页逻辑
+#   options.html / *.js                  设置项全集
+#   _locales/*/messages.json             48 语言文案（可反推全部功能名与提示）</code></pre>
+  <p>检索关键词（定位存储键与协议）：</p>
+  <pre><code>grep -rn "storage.local" onetab_unpacked/
+grep -rnoE "chrome\.(tabs|tabGroups|storage|contextMenus|omnibox|commands|scripting|readingList|bookmarks|alarms|identity)\.[a-zA-Z]+" onetab_unpacked/ | sort -u
+grep -rn "one-tab.com" onetab_unpacked/          # 同步/分享端点
+grep -rniE "AES|encrypt|decrypt|PBKDF|salt|iv" onetab_unpacked/  # 加密细节
+grep -rn "_locales" onetab_unpacked/_locales/zh_CN/messages.json | head</code></pre>
+
+  <h3>11.3 动态分析</h3>
+  <ul>
+    <li>加载解包扩展（<code>chrome://extensions</code> → 开发者模式 → 加载已解压）；</li>
+    <li><code>chrome://extensions</code> 上「Service Worker / 检查视图」打开后台 DevTools，观察消息与日志；</li>
+    <li>用 <b>Storage Inspector</b> 或 DevTools → Application 查看 <code>chrome.storage.local</code> 的真实键名与数据结构（这是确认第 7 章的关键一步）；</li>
+    <li>Network 面板抓取「分享为网页 / 同步」时的请求与载荷格式；</li>
+    <li>在不同版本（1.84 / 2.18 / 2.24）间 diff，定位 v1→v2 的迁移逻辑。</li>
+  </ul>
+
+  <h3>11.4 需要确认的关键问题清单</h3>
+  <ol>
+    <li>存储键名与结构（单体大对象 vs 分组多键）。</li>
+    <li>走的是 <code>chrome.storage.local</code> 还是 IndexedDB？v1 是否用 <code>localStorage</code>？迁移如何触发？</li>
+    <li>是否使用 <code>chrome.tabs.discard</code>（网传）还是纯 <code>remove</code>（官方描述）？</li>
+    <li>同步的加密算法、密钥派生、后端 API 契约。</li>
+    <li>omnibox 关键词（<code>11</code>）与快捷列表的实际实现。</li>
+    <li><code>scripting</code> + <code>activeTab</code> 用于什么场景。</li>
+  </ol>
+</section>
+
+<!-- ================= 12 ================= -->
+<section id="s12">
+  <h2><span class="num">12</span>my-tab 复刻实现建议<a class="anchor" href="#s12">#</a></h2>
+
+  <h3>12.1 建议的 MVP 范围</h3>
+  <p><b>P0（先跑通闭环）</b>：一键收起当前窗口 → 写入 <code>chrome.storage.local</code> → 打开列表页展示 → 单条/整组/全部恢复 → 导出/导入 → 选项页（固定标签、去重、恢复行为）→ 快捷键。</p>
+  <p><b>P1（体验补齐）</b>：拖拽排序、多选、重命名、星标/锁定、文件夹、搜索栏 + omnibox、深色模式。</p>
+  <p><b>P2（差异化）</b>：任务/备注、快捷列表、分享为网页、<b>基于 OneDrive 的同步与备份</b>（见 4.8.2）、回收站与防丢失。</p>
+
+  <h3>12.2 架构建议</h3>
+  <ul>
+    <li><b>Manifest V3</b>，后台用 Service Worker；所有状态落 <code>chrome.storage</code>，SW 只做编排。</li>
+    <li><b>单写者模型</b>：由 SW 串行处理所有写操作，页面只发消息；用 <code>storage.onChanged</code> 广播刷新。</li>
+    <li>技术栈可选：原生 JS（最轻，OneTab 本身接近此路线）或 Vite + React/Preact（列表页交互复杂时更省力）。</li>
+    <li>列表页与选项页复用同一套数据层（storage 适配器 + 纯函数 reducer），便于测试。</li>
+  </ul>
+
+  <h3>12.3 数据结构</h3>
+  <p>沿用第 7.3 节草案。关键约定：</p>
+  <ul>
+    <li>每条 <code>TabItem</code> 用 <code>uuid</code> 作稳定 id，避免依赖浏览器 tabId（tabId 会话内有效且会复用）。</li>
+    <li><code>store.version</code> 做 schema 版本化，为将来迁移留钩子——这正是 OneTab 的痛点，my-tab 应主动设计迁移器。</li>
+    <li>大量标签时按组切键（如 <code>group:&lt;id&gt;</code>）以规避单值体积与写入放大。</li>
+  </ul>
+
+  <h3>12.4 关键技术点与坑</h3>
+  <ul>
+    <li><b>先写库再关标签</b>，且对「关闭失败/部分失败」做补偿。</li>
+    <li><b>排除自身页面</b>（列表页、选项页）不被收起。</li>
+    <li><b>去重</b>：按归一化 URL（去 fragment/常见 tracking 参数）判断。</li>
+    <li><b>favicon</b>：优先用 <code>favicon</code> 权限或 Google <code>t2.gstatic.com</code> 服务；离线场景要降级为默认图标。</li>
+    <li><b>无痕模式</b>：需 <code>incognito: "spanning"</code> 或用户手动授权，注意隔离。</li>
+    <li><b>大列表性能</b>：列表页用虚拟滚动（OneTab 在数千条时变慢是已知短板，可作为超越点）。</li>
+    <li><b>防丢失</b>：内置导出快照 + 升级前自动备份 + 回收站（软删除）。</li>
+    <li><b>OneDrive 同步备份</b>（见 4.8.2）：只读写一个 JSON 快照文件，同步交给 OneDrive 客户端；用目录句柄（File System Access API）实现静默自动备份，不可用时降级为 <code>chrome.downloads</code> 手动导出。合并按 <code>id</code> + <code>updatedAt</code> 做 LWW，删除用 <code>deletedAt</code> 软删除传递，避免复活。</li>
+  </ul>
+
+  <h3>12.5 建议的迭代路线</h3>
+  <ol>
+    <li><b>M1</b>：MV3 骨架 + 收起/恢复 + 本地存储 + 列表页（P0 闭环）。</li>
+    <li><b>M2</b>：组织能力（拖拽/文件夹/星标/锁定）+ 搜索 + 选项页完善。</li>
+    <li><b>M3</b>：防丢失（回收站/备份/迁移器）+ 大列表性能。</li>
+    <li><b>M4</b>：OneDrive 同步与备份（快照文件 + 合并策略）+ 分享为网页 + 跨浏览器适配。</li>
+  </ol>
+</section>
+
+<!-- ================= 附录 ================= -->
+<section id="appendix">
+  <h2>附录<a class="anchor" href="#appendix">#</a></h2>
+
+  <h3>附录 A · 真实 manifest.json（OneTab v1.84，已证实原文）</h3>
+  <pre><code>{
+  "update_url": "https://clients2.google.com/service/update2/crx",
+  "manifest_version": 3,
+  "name": "OneTab",
+  "description": "__MSG_manifestDescription__",
+  "version": "1.84",
+  "default_locale": "en",
+  "key": "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDs2r/nSa4MRBoDT1pBx+Q9gI0JaTBaIrsD4uKT9oA4HUF2xboeOA1BDw3lmoJ4G8BL0tAbJTcEnxlkTsCY7C413MojaeDZy4pza3RJqkMAKiJisl8t8eiP+c0ox3l1syb1xmI7EEIouXIxlCX8LGoguB0AuWtunGLCjiLoM2vJLQIDAQAB",
+  "commands": {
+    "display-onetab": {
+      "suggested_key": { "default": "Alt+Shift+1" },
+      "description": "__MSG_displayOneTab__"
+    },
+    "send-current-tab-to-onetab": { "description": "__MSG_sendCurrentTabToOneTab__" }
+  },
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "icons": {
+    "128": "images/extension-icon128.png",
+    "64":  "images/extension-icon64.png",
+    "48":  "images/extension-icon48.png",
+    "32":  "images/extension-icon32.png",
+    "16":  "images/extension-icon16.png"
+  },
+  "optional_permissions": [ "tabGroups" ],
+  "permissions": [ "favicon", "unlimitedStorage", "storage", "activeTab", "scripting", "tabs", "contextMenus" ],
+  "action": { "default_icon": { "19": "images/icon19.png", "38": "images/icon38.png" } },
+  "background": { "service_worker": "ext-onetab-concatenated-sources-background.js" },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' data: https://t2.gstatic.com;"
+  }
+}</code></pre>
+  <p class="legend">注：v2.2 起新增可选主机权限 <code>https://www.one-tab.com/*</code> 与可选权限 <code>readingList</code> / <code>bookmarks</code>（该三项在 v1.84 中尚未出现）。</p>
+
+  <h3>附录 B · 版本与权限变迁</h3>
+  <table>
+    <thead><tr><th>时间</th><th>版本</th><th>变化</th></tr></thead>
+    <tbody>
+      <tr><td>2026-10-11</td><td>2.24</td><td>体积 2.87 MB（最新）</td></tr>
+      <tr><td>2026-07-05</td><td>2.18</td><td>商店展示版，2.5 MiB，48 语言</td></tr>
+      <tr><td>2026-03-22</td><td>2.14</td><td>—</td></tr>
+      <tr><td>2026-03</td><td>2.x 全量</td><td>v2 重写向全体用户推送</td></tr>
+      <tr><td>2025-09-24</td><td>1.86 → 2.2</td><td><b>新增</b>可选主机权限 <code>www.one-tab.com/*</code>；可选权限 <code>readingList</code>、<code>bookmarks</code></td></tr>
+      <tr><td>2024-06-11</td><td>1.86</td><td>v1 末版</td></tr>
+      <tr><td>2023-10-09</td><td>1.84</td><td>（本说明书 manifest 取样版本）</td></tr>
+      <tr><td>2023-06-26</td><td>1.69 → 1.72</td><td>新增可选权限 <code>tabGroups</code></td></tr>
+      <tr><td>2023-05-30</td><td>1.58 → 1.61</td><td>新增 <code>scripting</code>、<code>favicon</code>；移除 <code>chrome://favicon/</code></td></tr>
+      <tr><td>MV2 时代</td><td>1.18</td><td>权限：<code>tabs, &lt;all_urls&gt;, webRequest, webRequestBlocking, contextMenus</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>附录 C · 资料来源</h3>
+  <ul>
+    <li>官网中文版 <code>https://www.one-tab.com/zh-CN/</code>（功能、隐私、安装/卸载/排障）</li>
+    <li>官方帮助页 <code>https://one-tab.com/help</code>（全部功能操作说明）</li>
+    <li>官方故障排查 <code>https://www.one-tab.com/troubleshooting</code>（数据丢失原因）</li>
+    <li>官方标签恢复 <code>https://www.one-tab.com/tab-recovery</code>（datadump 工具）</li>
+    <li>Chrome Web Store 详情页（v2.18 / 48 语言 / 隐私声明）</li>
+    <li><code>chrome-stats.com</code>（v2.24、权限沿革、风险评级）</li>
+    <li><code>ilovechrome.com</code> / <code>crx4chrome.com</code>（真实 manifest v1.84、MV2 权限）</li>
+    <li>百度百科「OneTab」词条（发展历程、用户规模）</li>
+    <li>第三方对比评测（Amazing Tabs / Uncluttr / Blackmount，用于竞品坐标与付费同步现状）</li>
+  </ul>
+  <p class="legend">所有「已证实」结论均可回溯至上列来源；涉及具体存储键名、加密实现、discard/remove 之争的结论，请以第 11 章解包结果为准。</p>
+</section>
+
+</main>
+
+<footer>
+  OneTab 功能说明书 · 为 my-tab 项目整理 · 2026-10-13 · 基于公开来源与真实 manifest，推断项已明确标注
+</footer>
+</div>
+</body>
+</html>

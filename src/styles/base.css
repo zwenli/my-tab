@@ -1,0 +1,349 @@
+/**
+ * 全局基础样式：重置、排版、通用原子类、滚动条、动效降级。
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-wrap: break-word;
+}
+
+#app {
+  height: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-xs);
+}
+
+/* 滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+  background-clip: content-box;
+}
+
+/* ---------- 通用原子类 ---------- */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+}
+.row-gap {
+  gap: var(--space-2);
+}
+.spacer {
+  flex: 1 1 auto;
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.muted {
+  color: var(--text-muted);
+}
+.dim {
+  color: var(--text-dim);
+}
+
+/* ---------- 按钮 ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: background var(--transition), border-color var(--transition), color var(--transition),
+    transform var(--transition);
+}
+.btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+.btn-ghost:hover {
+  background: var(--surface-2);
+  border-color: transparent;
+  color: var(--text);
+}
+.btn-danger {
+  color: var(--danger);
+  border-color: transparent;
+  background: transparent;
+}
+.btn-danger:hover {
+  background: var(--danger-soft);
+  border-color: transparent;
+}
+.btn-sm {
+  height: 26px;
+  padding: 0 9px;
+  font-size: var(--text-xs);
+}
+.btn-lg {
+  height: 40px;
+  padding: 0 18px;
+  font-size: var(--text-base);
+}
+.btn-icon {
+  width: 32px;
+  padding: 0;
+}
+.btn-icon.btn-sm {
+  width: 26px;
+}
+
+/* ---------- 输入 ---------- */
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  height: 34px;
+  font-size: var(--text-base);
+  color: var(--text);
+  transition: border-color var(--transition), background var(--transition);
+}
+.textarea {
+  height: auto;
+  padding: 8px 10px;
+  resize: vertical;
+  line-height: 1.5;
+}
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--text-dim);
+}
+.input:hover,
+.select:hover,
+.textarea:hover {
+  border-color: var(--border-strong);
+}
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--bg-elevated);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+/* ---------- 卡片 / 面板 ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.divider {
+  height: 1px;
+  background: var(--border-soft);
+  border: 0;
+  margin: 0;
+}
+
+/* ---------- 提示气泡 ---------- */
+
+.tip {
+  position: relative;
+}
+.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  background: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  padding: 4px 8px;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition), transform var(--transition);
+  z-index: 60;
+  box-shadow: var(--shadow-2);
+}
+.tip:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ---------- 动效降级 ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
