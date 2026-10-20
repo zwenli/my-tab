@@ -137,10 +137,6 @@ onMounted(async () => {
       <div class="blk-head">
         <Icon name="clock" :size="13" class="blk-ico" />
         <span>{{ t('popup.recent') }}</span>
-        <span class="spacer" />
-        <button class="btn btn-ghost btn-sm" type="button" @click="openList('')">
-          {{ t('popup.openList') }}<Icon name="chevron-right" :size="13" />
-        </button>
       </div>
 
       <p v-if="!recent.length" class="empty">{{ t('popup.noRecent') }}</p>

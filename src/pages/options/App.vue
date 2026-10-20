@@ -402,7 +402,7 @@ onMounted(async () => {
             <p class="b-hint">{{ t('settings.libraryRescanHint') }}</p>
           </div>
 
-          <div class="card">
+          <div class="card box">
             <div class="b-title">{{ t('settings.libraryTree') }}</div>
             <pre class="tree">{{ libraryTree }}</pre>
             <p class="b-hint">{{ t('settings.libraryTreeHint') }}</p>
@@ -752,7 +752,7 @@ onMounted(async () => {
 }
 
 .tree {
-  margin: 10px 0 0;
+  margin: 0;
   padding: 14px 16px;
   background: var(--bg-code, rgba(127, 127, 127, 0.08));
   border: 1px solid var(--border-soft, rgba(127, 127, 127, 0.2));
