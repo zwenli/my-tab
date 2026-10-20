@@ -121,6 +121,7 @@ const enUS: Messages = {
   'item.task': 'Mark as to-do',
   'item.taskDone': 'Mark as done',
   'item.taskUndone': 'Mark as not done',
+  'item.taskClear': 'Remove to-do mark',
   'item.note': 'Note',
   'item.notePlaceholder': 'Add a note for this tab…',
   'item.delete': 'Delete',

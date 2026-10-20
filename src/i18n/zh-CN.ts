@@ -128,6 +128,7 @@ const zhCN: Messages = {
   'item.task': '加为待办',
   'item.taskDone': '标记完成',
   'item.taskUndone': '恢复未完成',
+  'item.taskClear': '取消待办标记',
   'item.note': '备注',
   'item.notePlaceholder': '给这条标签写点备注…',
   'item.delete': '删除',

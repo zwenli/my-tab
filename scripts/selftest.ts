@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import { LIBRARY_FORMAT } from '../src/core/constants'
 import { filesToState, groupFileName, isConflictCopy, shortId, stateToFiles } from '../src/core/libraryFormat'
-import { computeStats, createGroup, emptyState, normalizeState } from '../src/core/model'
+import { badgeText, computeStats, countOpenTasks, createGroup, createTabItem, emptyState, normalizeState } from '../src/core/model'
 import * as M from '../src/core/mutations'
 import { searchItems } from '../src/core/search'
 import { exportToHtml, exportToText, parseText } from '../src/core/exportImport'
@@ -171,6 +171,48 @@ const run = async (): Promise<void> => {
 
     M.setItemTask(s, id, null)
     assert.equal(task(), null)
+  })
+
+  await test('待办计数（工具栏徽标口径）：只算未完成，且不含快捷列表', () => {
+    const s = emptyState('d')
+    const g = M.collectTabs(
+      s,
+      [tab('https://a.com', 'A'), tab('https://b.com', 'B'), tab('https://c.com', 'C')],
+      {}
+    ).group!
+    const [a, b, c] = g.items
+
+    assert.equal(countOpenTasks(s), 0, '初始没有待办')
+
+    M.setItemTask(s, a!.id, { done: false, completedAt: null })
+    assert.equal(countOpenTasks(s), 1)
+
+    M.setItemTask(s, b!.id, { done: false, completedAt: null })
+    M.toggleItemTask(s, b!.id)
+    assert.equal(countOpenTasks(s), 1, '已完成的不计入')
+
+    M.setItemTask(s, c!.id, { done: false, completedAt: null })
+    assert.equal(countOpenTasks(s), 2)
+
+    M.setItemTask(s, c!.id, null)
+    assert.equal(countOpenTasks(s), 1, '取消待办标记后不再计入')
+
+    // 快捷列表是常驻收藏，不进待办进度
+    const q = createTabItem({ url: 'https://q.com', title: 'Q' })
+    q.task = { done: false, completedAt: null }
+    s.quickList.push(q)
+    assert.equal(countOpenTasks(s), 1, '快捷列表的待办不计入')
+
+    // 与侧边栏共用的统计口径保持一致
+    assert.equal(computeStats(s).taskOpen, 1)
+  })
+
+  await test('徽标文本：没有待办不显示，超出收敛为 99+', () => {
+    assert.equal(badgeText(0), '', '0 个待办不显示数字')
+    assert.equal(badgeText(-1), '')
+    assert.equal(badgeText(3), '3')
+    assert.equal(badgeText(99), '99')
+    assert.equal(badgeText(100), '99+')
   })
 
   await test('快捷列表去重', () => {

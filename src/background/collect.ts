@@ -2,7 +2,7 @@
  * 收集标签：把浏览器标签折叠成一个 MyTab 标签组，并关闭原标签。
  */
 import { collectTabs } from '@/core/mutations'
-import { defaultGroupTitle } from '@/core/model'
+import { badgeText, countOpenTasks, defaultGroupTitle } from '@/core/model'
 import { loadState, mutate } from '@/core/storage'
 import {
   closeTabs,
@@ -20,6 +20,9 @@ import { resolveLocale } from '@/i18n'
 import type { CollectOptions, CollectResult } from '@/types'
 
 let collecting = false
+
+/** 徽标底色：待办是「待处理」信号，用琥珀色与普通计数区分 */
+const BADGE_COLOR = '#C98A12'
 
 /** 与页面消息协议共用的收集参数 */
 export type CollectParams = CollectOptions
@@ -85,11 +88,23 @@ export async function collect({ mode = 'auto', windowId, tabId, openList = true,
 /** 收起当前窗口（自动识别多选） */
 export const collectAuto = (params: CollectParams = {}): Promise<CollectResult> => collect({ mode: 'auto', ...params })
 
-/** 刷新工具栏徽标数量 */
+/**
+ * 刷新工具栏徽标：显示**未完成待办数**，而不是标签条目总数。
+ *
+ * 理由：收起的标签条目数对使用没有指导意义（收得越多数字越大，反而像噪音）；
+ * 待办才是「还需要你去处理的事」，所以徽标只提示待办，没有待办就不显示数字。
+ * 口径与侧边栏「待办」一致，见 core/model 的 countOpenTasks。
+ */
 export async function refreshBadge(): Promise<void> {
   if (typeof chrome === 'undefined' || !chrome.action) return
   const state = await loadState()
-  const count = state.groups.reduce((n, g) => n + g.items.length, 0)
-  chrome.action.setBadgeBackgroundColor({ color: '#2E6BE6' })
-  chrome.action.setBadgeText({ text: count > 0 ? String(count > 999 ? '999+' : count) : '' })
+  const text = badgeText(countOpenTasks(state))
+  chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR })
+  // Chrome 110+ 支持指定文字颜色；老版本忽略即可（默认白色）
+  try {
+    chrome.action.setBadgeTextColor?.({ color: '#FFFFFF' })
+  } catch {
+    /* ignore */
+  }
+  chrome.action.setBadgeText({ text })
 }

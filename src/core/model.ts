@@ -270,6 +270,25 @@ export function migrate(state: MyTabState): MyTabState {
 
 /* ---------------------------- 统计 ---------------------------- */
 
+/**
+ * 未完成待办数量（工具栏徽标 / 侧边栏 / 「待办」分组共用一个口径）。
+ * 只统计组内条目：快捷列表是常驻收藏，不算待办进度。
+ */
+export function countOpenTasks(state: MyTabState): number {
+  let n = 0
+  for (const g of state.groups ?? []) for (const it of g.items ?? []) if (it.task && !it.task.done) n++
+  return n
+}
+
+/**
+ * 工具栏徽标文本：0 个待办就不显示（返回空串，徽标消失），超过 99 收敛为 99+。
+ * 徽标代表「还有多少事要处理」，所以不显示标签条目总数。
+ */
+export function badgeText(count: number): string {
+  if (!Number.isFinite(count) || count <= 0) return ''
+  return count > 99 ? '99+' : String(Math.floor(count))
+}
+
 export function computeStats(state: MyTabState): Stats {
   const groups = state.groups ?? []
   const items = groups.flatMap((g) => g.items ?? [])
@@ -289,7 +308,7 @@ export function computeStats(state: MyTabState): Stats {
     folderCount: (state.folders ?? []).length,
     starredCount: groups.filter((g) => g.starred).length + items.filter((i) => i.starred).length,
     lockedCount: groups.filter((g) => g.locked).length,
-    taskOpen: items.filter((i) => i.task && !i.task.done).length,
+    taskOpen: countOpenTasks(state),
     domainCount: domains.size
   }
 }

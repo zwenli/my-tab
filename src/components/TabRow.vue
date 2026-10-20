@@ -47,13 +47,21 @@ const isLocked = computed<boolean>(() => {
 })
 
 const menuItems = computed<MenuItem[]>(() => {
+  const task = props.item.task
   const list: MenuItem[] = [
     { key: 'open', label: t('item.openInNewTab'), icon: 'external-link' },
-    { key: 'star', label: props.item.starred ? t('item.unstar') : t('item.star'), icon: 'star' },
-    { key: 'task', label: props.item.task?.done ? t('item.taskUndone') : t('item.task'), icon: 'check-square' },
-    { key: 'note', label: t('item.note'), icon: 'note' },
-    { key: 'copy', label: t('item.copyUrl'), icon: 'copy' }
+    { key: 'star', label: props.item.starred ? t('item.unstar') : t('item.star'), icon: 'star' }
   ]
+  // 待办三态：未加待办 → 加为待办；未完成 → 标记完成；已完成 → 恢复未完成
+  if (!task) {
+    list.push({ key: 'task', label: t('item.task'), icon: 'check-square' })
+  } else {
+    list.push({ key: 'task', label: task.done ? t('item.taskUndone') : t('item.taskDone'), icon: task.done ? 'refresh-cw' : 'check-circle' })
+    // 取消待办标记（不是删除标签，只是把这条从待办里摘掉）
+    list.push({ key: 'taskClear', label: t('item.taskClear'), icon: 'x-circle' })
+  }
+  list.push({ key: 'note', label: t('item.note'), icon: 'note' })
+  list.push({ key: 'copy', label: t('item.copyUrl'), icon: 'copy' })
   if (props.source === 'quick') {
     list.push({ separator: true })
     list.push({ key: 'remove', label: t('item.removeFromQuick'), icon: 'trash', danger: true })
@@ -82,6 +90,9 @@ async function onSelect(key: string): Promise<void> {
       break
     case 'task':
       await data.toggleItemTask(props.item.id)
+      break
+    case 'taskClear':
+      await data.setItemTask(props.item.id, null)
       break
     case 'note':
       ui.openDialog('prompt', {
@@ -146,6 +157,13 @@ const taskState = computed<'none' | 'open' | 'done'>(() => {
   return props.item.task.done ? 'done' : 'open'
 })
 
+/** 行内待办按钮的提示要跟着三态走，避免「写着加为待办、点了却变完成」 */
+const taskTip = computed<string>(() => {
+  if (taskState.value === 'done') return t('item.taskUndone')
+  if (taskState.value === 'open') return t('item.taskDone')
+  return t('item.task')
+})
+
 const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
 
 const titleHtml = computed<string>(() => {
@@ -207,7 +225,7 @@ const titleHtml = computed<string>(() => {
       <button
         class="btn btn-ghost btn-icon btn-sm"
         type="button"
-        v-tip="taskState === 'done' ? t('item.taskUndone') : t('item.task')"
+        v-tip="taskTip"
         @click.stop="data.toggleItemTask(item.id)"
       >
         <Icon :name="taskState === 'done' ? 'check-circle' : 'check-square'" :size="14" />
