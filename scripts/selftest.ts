@@ -132,6 +132,21 @@ const run = async (): Promise<void> => {
     assert.equal(s.groups[0]!.items.length, 0)
   })
 
+  await test('removeItems 可选清掉变空的组（还原后移除）', () => {
+    const s = emptyState('d')
+    const g = M.collectTabs(s, [tab('https://a.com', 'A'), tab('https://b.com', 'B')], {}).group!
+    M.removeItems(s, [g.items[0]!.id], { pruneEmptyGroups: true })
+    assert.equal(s.groups.length, 1, '还没空，组应保留')
+    M.removeItems(s, [g.items[0]!.id], { pruneEmptyGroups: true })
+    assert.equal(s.groups.length, 0, '空了应移除组')
+
+    const locked = M.collectTabs(s, [tab('https://c.com', 'C')], {}).group!
+    M.toggleGroupLock(s, locked.id)
+    M.removeItems(s, [locked.items[0]!.id], { pruneEmptyGroups: true })
+    assert.equal(s.groups.length, 1, '锁定组不清')
+    assert.equal(s.groups[0]!.items.length, 1, '锁定组的条目也不删')
+  })
+
   await test('待办标记：创建 → 完成 → 取消完成 → 清除', () => {
     const s = emptyState('d')
     const g = M.collectTabs(s, [tab('https://a.com', 'A')], {}).group!

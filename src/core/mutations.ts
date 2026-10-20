@@ -281,19 +281,34 @@ export function setItemTask(state: MyTabState, itemId: string, task: TaskFlag | 
 export const setItemNote = (state: MyTabState, itemId: string, note: string): MutationOutcome =>
   updateItem(state, itemId, { note: String(note ?? '') })
 
-export function removeItems(state: MyTabState, itemIds: string[] = []): MutationOutcome {
+export interface RemoveItemsOptions {
+  /** true 时把因此变空的组一并删掉（还原后移除场景，避免留下空组） */
+  pruneEmptyGroups?: boolean
+}
+
+export function removeItems(state: MyTabState, itemIds: string[] = [], opts: RemoveItemsOptions = {}): MutationOutcome {
   const ids = new Set(itemIds)
   if (!ids.size) return { state }
   const ts = now()
+  const touched: Group[] = []
 
   for (const g of state.groups) {
     if (g.locked) continue
     const before = g.items.length
     g.items = g.items.filter((it) => !ids.has(it.id))
-    if (g.items.length !== before) g.updatedAt = ts
+    if (g.items.length !== before) {
+      g.updatedAt = ts
+      touched.push(g)
+    }
   }
 
   state.quickList = state.quickList.filter((it) => !ids.has(it.id))
+
+  // 只清掉「本次被搬空」的组，用户自己建的空组不动
+  if (opts.pruneEmptyGroups) {
+    const emptied = new Set(touched.filter((g) => !g.items.length).map((g) => g.id))
+    if (emptied.size) state.groups = state.groups.filter((g) => !emptied.has(g.id))
+  }
 
   return { state: touch(state) }
 }

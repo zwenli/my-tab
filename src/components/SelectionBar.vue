@@ -33,7 +33,7 @@ function exit(): void {
 }
 
 async function restore(): Promise<void> {
-  await actions.restoreItems(selectedItems.value, { removeAfter: false })
+  await actions.restoreItems(selectedItems.value)
   ui.clearSelection()
 }
 

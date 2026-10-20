@@ -151,7 +151,7 @@ onMounted(async () => {
             <span class="r-title truncate">{{ g.title || t('group.untitled') }}</span>
             <span class="r-meta">{{ t('group.itemCount', { n: g.items.length }) }} · {{ humanTime(g.createdAt, dateLocale) }}</span>
           </button>
-          <button class="btn btn-ghost btn-icon btn-sm" type="button" v-tip="t('popup.restore')" @click="actions.restoreGroup(g, { removeAfter: false })">
+          <button class="btn btn-ghost btn-icon btn-sm" type="button" v-tip="t('popup.restore')" @click="actions.restoreGroup(g)">
             <Icon name="external-link" :size="14" />
           </button>
         </li>

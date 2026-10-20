@@ -120,7 +120,8 @@ export function useActions(): UseActionsApi {
 
     const settings = data.settings
     const target = opts.target ?? settings.restoreTarget ?? 'current'
-    const removeAfter = opts.removeAfter === undefined || opts.removeAfter === null ? !!settings.removeAfterRestore : opts.removeAfter
+    // 未显式指定时一律以「设置」为准，避免各处调用点把设置覆盖掉
+    const removeAfter = opts.removeAfter ?? !!settings.removeAfterRestore
 
     await openUrls(
       list.map((i) => i.url),
@@ -128,25 +129,30 @@ export function useActions(): UseActionsApi {
     )
 
     if (removeAfter) {
-      const ids = list.map((i) => i.id).filter(Boolean)
-      if (ids.length) await data.removeItems(ids)
+      // 快捷列表里的条目是「常驻收藏」，打开后不参与移除
+      const ids = list.map((i) => i.id).filter((id) => !!id && !!data.itemIndex.get(id)?.group)
+      if (ids.length) await data.removeItems(ids, { pruneEmptyGroups: true })
     }
 
     if (!opts.quiet) ui.toast(t('toast.restored', { n: list.length }), 'success')
     return list.length
   }
 
-  /** 恢复整组（默认不从列表移除） */
+  /** 恢复整组（默认跟随设置） */
   function restoreGroup(group: Group, opts: RestoreOptions = {}): Promise<number> {
-    return restoreItems(group?.items ?? [], { removeAfter: false, ...opts })
+    return restoreItems(group?.items ?? [], opts)
   }
 
   /** 恢复全部（列表中所有组的标签） */
   async function restoreAll(): Promise<number> {
     const all = data.groups.flatMap((g) => g.items)
     if (!all.length) return 0
-    const count = await restoreItems(all, { removeAfter: false })
+
+    // 逐条移除在这里没有意义：整表还原要么清空列表，要么只把条目移掉（不留空壳组）
+    const count = await restoreItems(all, { removeAfter: false, quiet: true })
     if (data.settings.clearListAfterRestore) await data.clearGroups()
+    else if (data.settings.removeAfterRestore) await data.removeItems(all.map((i) => i.id), { pruneEmptyGroups: true })
+
     ui.toast(t('toast.restored', { n: count }), 'success')
     return count
   }

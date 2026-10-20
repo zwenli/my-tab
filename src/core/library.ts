@@ -152,15 +152,19 @@ async function writeTextFile(root: FileSystemDirectoryHandle, path: string, text
 
 /** 把文件移到 `_trash/<时间戳>-<原名>`，而不是直接删掉 */
 async function trashFile(root: FileSystemDirectoryHandle, path: string): Promise<void> {
-  const { name } = splitPath(path)
+  const { dir, name } = splitPath(path)
+  const text = await readTextFile(root, path)
+  if (text == null) return
   try {
     const trash = await root.getDirectoryHandle(TRASH_DIR, { create: true })
     const stamp = new Date(now()).toISOString().replace(/[:.]/g, '-')
     const target = await trash.getFileHandle(`${stamp}-${name}`, { create: true })
     const writable = await target.createWritable()
-    const text = await readTextFile(root, path)
-    await writable.write(new Blob([text ?? ''], { type: 'application/json' }))
+    await writable.write(new Blob([text], { type: 'application/json' }))
     await writable.close()
+    // 复制成功后才移除原文件 —— 否则下次扫描会把它读回来，删除就等于没删
+    const parent = await ensureParentDir(root, dir, false)
+    await parent.removeEntry(name)
   } catch {
     /* 进不了回收站也不阻塞主流程 */
   }

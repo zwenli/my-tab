@@ -68,7 +68,8 @@ const menuItems = computed<MenuItem[]>(() => {
 
 async function open(): Promise<void> {
   emit('open', props.item)
-  await actions.restoreItems([props.item], { removeAfter: false, quiet: true })
+  // 快捷列表条目由 restoreItems 内部保护，不会被「还原后移除」删掉
+  await actions.restoreItems([props.item], { quiet: true })
 }
 
 async function onSelect(key: string): Promise<void> {

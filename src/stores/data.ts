@@ -197,7 +197,7 @@ export const useDataStore = defineStore('data', () => {
     },
     setItemTask: (id: string, task: TaskFlag | null) => run((s) => M.setItemTask(s, id, task)),
     setItemNote: (id: string, note: string) => run((s) => M.setItemNote(s, id, note)),
-    removeItems: (ids: string[]) => run((s) => M.removeItems(s, ids)),
+    removeItems: (ids: string[], opts?: M.RemoveItemsOptions) => run((s) => M.removeItems(s, ids, opts)),
     removeItem: (id: string) => run((s) => M.removeItem(s, id)),
     moveItemInGroup: (gid: string, from: number, to: number) => run((s) => M.moveItemInGroup(s, gid, from, to)),
     moveItemToGroup: (id: string, gid: string, index: number) => run((s) => M.moveItemToGroup(s, id, gid, index)),

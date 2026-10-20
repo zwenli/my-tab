@@ -249,7 +249,7 @@ function toggleSelect(): void {
       </div>
 
       <div class="acts">
-        <button class="btn btn-ghost btn-sm" type="button" v-tip="t('group.restoreAllHint')" @click="actions.restoreGroup(group, { removeAfter: false })">
+        <button class="btn btn-ghost btn-sm" type="button" v-tip="t('group.restoreAllHint')" @click="actions.restoreGroup(group)">
           <Icon name="external-link" :size="14" /><span class="lbl">{{ t('group.restoreAll') }}</span>
         </button>
         <button class="btn btn-ghost btn-icon btn-sm" type="button" v-tip="t('group.copyLinksHint')" @click="actions.copyLinks(group.items)">

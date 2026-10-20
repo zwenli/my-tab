@@ -30,10 +30,7 @@ function sourceLabel(r: SearchHit): string {
 }
 
 function openAll(): void {
-  actions.restoreItems(
-    limited.value.map((r) => r.item),
-    { removeAfter: false }
-  )
+  actions.restoreItems(limited.value.map((r) => r.item))
 }
 </script>
 
