@@ -12,6 +12,7 @@ import * as M from '../src/core/mutations'
 import { searchItems } from '../src/core/search'
 import { exportToHtml, exportToText, parseText } from '../src/core/exportImport'
 import { buildPayload, linksText, packPayload, renderShareText, renderStandaloneHtml, unpackPayload } from '../src/core/share'
+import { resolveTipDir, resolveTipPos } from '../src/directives/tipGeometry'
 import type { CollectableTab, MyTabState, TaskFlag } from '../src/types'
 
 let passed = 0
@@ -378,6 +379,46 @@ const run = async (): Promise<void> => {
     })
     assert.equal(renderShareText(payload).split('\n').length, 4)
     assert.equal(linksText(payload.items), 'https://a.com\nhttps://b.com')
+  })
+
+  console.log('\n[7] 提示气泡定位')
+
+  await test('顶栏按钮（贴着上沿）自动朝下', () => {
+    const rect = { left: 500, top: 10, right: 530, bottom: 38, width: 30, height: 28 }
+    assert.equal(resolveTipDir(rect, 80, 26, 'auto', 8, { vw: 1200, vh: 800 }), 'bottom')
+  })
+
+  await test('页面中部按钮优先朝上', () => {
+    const rect = { left: 400, top: 400, right: 430, bottom: 428, width: 30, height: 28 }
+    assert.equal(resolveTipDir(rect, 80, 26, 'auto', 8, { vw: 1200, vh: 800 }), 'top')
+  })
+
+  await test('底部按钮自动翻到上方', () => {
+    const rect = { left: 400, top: 760, right: 430, bottom: 788, width: 30, height: 28 }
+    assert.equal(resolveTipDir(rect, 80, 26, 'auto', 8, { vw: 1200, vh: 800 }), 'top')
+  })
+
+  await test('显式方向优先于自动检测', () => {
+    const rect = { left: 400, top: 400, right: 430, bottom: 428, width: 30, height: 28 }
+    assert.equal(resolveTipDir(rect, 80, 26, 'right', 8, { vw: 1200, vh: 800 }), 'right')
+  })
+
+  await test('贴右边缘的气泡被夹回视口内', () => {
+    const rect = { left: 1160, top: 10, right: 1190, bottom: 38, width: 30, height: 28 }
+    const pos = resolveTipPos(rect, 200, 26, 'bottom', 8, { vw: 1200, vh: 800 })
+    assert.equal(pos.x, 1200 - 200 - 8, '右侧至少要留 8px')
+    assert.equal(pos.y, 38 + 8)
+  })
+
+  await test('超宽气泡也不会越界', () => {
+    const rect = { left: 600, top: 400, right: 630, bottom: 428, width: 30, height: 28 }
+    const pos = resolveTipPos(rect, 1400, 26, 'top', 8, { vw: 400, vh: 800 })
+    assert.equal(pos.x, 8)
+  })
+
+  await test('朝下时 y 取元素下沿 + 间距', () => {
+    const rect = { left: 100, top: 10, right: 130, bottom: 38, width: 30, height: 28 }
+    assert.deepEqual(resolveTipPos(rect, 80, 26, 'bottom', 8, { vw: 1200, vh: 800 }), { x: 75, y: 46 })
   })
 
   console.log(`\n结果：${passed} 通过 / ${failed} 失败\n`)

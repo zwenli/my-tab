@@ -5,6 +5,7 @@
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import Icon from './Icon.vue'
 import type { MenuItem } from '@/types'
+import type { TipDir } from '@/directives'
 
 const props = withDefaults(
   defineProps<{
@@ -17,6 +18,8 @@ const props = withDefaults(
     variant?: string
     size?: 'sm' | 'md'
     tip?: string
+    /** 气泡方向：auto 自动避让，顶栏建议 bottom */
+    tipDir?: TipDir
     disabled?: boolean
   }>(),
   {
@@ -28,6 +31,7 @@ const props = withDefaults(
     variant: 'ghost',
     size: 'sm',
     tip: '',
+    tipDir: 'auto',
     disabled: false
   }
 )
@@ -104,11 +108,11 @@ defineExpose({ close, open: (): void => void (open.value = true) })
   <span ref="root" class="dd">
     <button
       class="btn trigger"
-      :class="[`btn-${variant}`, size === 'sm' ? 'btn-sm' : '', !label ? 'btn-icon' : '', tip ? 'tip' : '']"
+      :class="[`btn-${variant}`, size === 'sm' ? 'btn-sm' : '', !label ? 'btn-icon' : '']"
       type="button"
       :aria-expanded="open"
       aria-haspopup="menu"
-      :data-tip="tip || null"
+      v-tip="tip ? { text: tip, dir: tipDir } : undefined"
       :disabled="disabled"
       @click.stop="toggle"
     >

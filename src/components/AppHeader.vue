@@ -200,10 +200,10 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
       <span>{{ t('list.collectWindow') }}</span>
     </button>
 
-    <button class="btn btn-icon tip" type="button" :data-tip="t('list.newGroup')" @click="newGroup">
+    <button class="btn btn-icon" type="button" v-tip="{ text: t('list.newGroup'), dir: 'bottom' }" @click="newGroup">
       <Icon name="plus" :size="16" />
     </button>
-    <button class="btn btn-icon tip" type="button" :data-tip="t('list.newFolder')" @click="newFolder">
+    <button class="btn btn-icon" type="button" v-tip="{ text: t('list.newFolder'), dir: 'bottom' }" @click="newFolder">
       <Icon name="folder-plus" :size="16" />
     </button>
 
@@ -218,14 +218,15 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
       ]"
       icon="more-horizontal"
       :tip="t('common.more')"
+      tip-dir="bottom"
       align="end"
       @select="onGlobal"
     />
 
-    <DropdownMenu :items="themeOptions" icon="palette" :tip="t('list.theme')" align="end" @select="onTheme" />
-    <DropdownMenu :items="langOptions" icon="globe" :tip="t('list.language')" align="end" @select="onLang" />
+    <DropdownMenu :items="themeOptions" icon="palette" :tip="t('list.theme')" tip-dir="bottom" align="end" @select="onTheme" />
+    <DropdownMenu :items="langOptions" icon="globe" :tip="t('list.language')" tip-dir="bottom" align="end" @select="onLang" />
 
-    <button class="btn btn-icon tip" type="button" :data-tip="t('list.settings')" @click="openSettings">
+    <button class="btn btn-icon" type="button" v-tip="{ text: t('list.settings'), dir: 'bottom' }" @click="openSettings">
       <Icon name="settings" :size="16" />
     </button>
   </header>

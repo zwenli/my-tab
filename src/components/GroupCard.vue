@@ -249,20 +249,20 @@ function toggleSelect(): void {
       </div>
 
       <div class="acts">
-        <button class="btn btn-ghost btn-sm tip" type="button" :data-tip="t('group.restoreAllHint')" @click="actions.restoreGroup(group, { removeAfter: false })">
+        <button class="btn btn-ghost btn-sm" type="button" v-tip="t('group.restoreAllHint')" @click="actions.restoreGroup(group, { removeAfter: false })">
           <Icon name="external-link" :size="14" /><span class="lbl">{{ t('group.restoreAll') }}</span>
         </button>
-        <button class="btn btn-ghost btn-icon btn-sm tip" type="button" :data-tip="t('group.copyLinksHint')" @click="actions.copyLinks(group.items)">
+        <button class="btn btn-ghost btn-icon btn-sm" type="button" v-tip="t('group.copyLinksHint')" @click="actions.copyLinks(group.items)">
           <Icon name="copy" :size="14" />
         </button>
-        <button class="btn btn-ghost btn-icon btn-sm tip" type="button" :data-tip="t('group.share')" @click="actions.shareGroup(group)">
+        <button class="btn btn-ghost btn-icon btn-sm" type="button" v-tip="t('group.share')" @click="actions.shareGroup(group)">
           <Icon name="share" :size="14" />
         </button>
         <button
-          class="btn btn-ghost btn-icon btn-sm tip"
+          class="btn btn-ghost btn-icon btn-sm"
           type="button"
           :class="{ 'on-star': group.starred }"
-          :data-tip="group.starred ? t('group.unstar') : t('group.star')"
+          v-tip="group.starred ? t('group.unstar') : t('group.star')"
           @click="data.toggleGroupStar(group.id)"
         >
           <Icon name="star" :size="14" :filled="group.starred" />

@@ -197,24 +197,24 @@ const titleHtml = computed<string>(() => {
       <button
         class="btn btn-ghost btn-icon btn-sm"
         type="button"
-        :data-tip="item.starred ? t('item.unstar') : t('item.star')"
-        :class="['tip', item.starred ? 'on-star' : '']"
+        v-tip="item.starred ? t('item.unstar') : t('item.star')"
+        :class="item.starred ? 'on-star' : ''"
         @click.stop="data.toggleItemStar(item.id)"
       >
         <Icon name="star" :size="14" :filled="item.starred" />
       </button>
       <button
-        class="btn btn-ghost btn-icon btn-sm tip"
+        class="btn btn-ghost btn-icon btn-sm"
         type="button"
-        :data-tip="taskState === 'done' ? t('item.taskUndone') : t('item.task')"
+        v-tip="taskState === 'done' ? t('item.taskUndone') : t('item.task')"
         @click.stop="data.toggleItemTask(item.id)"
       >
         <Icon :name="taskState === 'done' ? 'check-circle' : 'check-square'" :size="14" />
       </button>
       <button
-        class="btn btn-ghost btn-icon btn-sm tip"
+        class="btn btn-ghost btn-icon btn-sm"
         type="button"
-        :data-tip="t('item.note')"
+        v-tip="t('item.note')"
         @click.stop="
           ui.openDialog('prompt', {
             title: t('item.note'),

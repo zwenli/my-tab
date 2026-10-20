@@ -270,33 +270,47 @@ ol {
   margin: 0;
 }
 
-/* ---------- 提示气泡 ---------- */
+/* ---------- 提示气泡 ----------
+ * 由 v-tip 指令（src/directives/tip.ts）在 <body> 上创建，fixed 定位：
+ * 不惧父级 overflow 裁剪与遮罩，方向由指令按剩余空间自动翻转。
+ * z-index 取在 菜单 120 / 多选条 150 / 弹窗 200 之上、Toast 400 之下。
+ */
 
-.tip {
-  position: relative;
-}
-.tip::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: calc(100% + 7px);
-  left: 50%;
-  transform: translateX(-50%) translateY(3px);
-  background: var(--surface-3);
-  color: var(--text);
+.tip-bubble {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 300;
+  max-width: 280px;
+  padding: 5px 9px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-xs);
-  padding: 4px 8px;
+  background: var(--surface-3);
+  color: var(--text);
   font-size: var(--text-xs);
-  white-space: nowrap;
+  line-height: 1.45;
+  text-align: center;
+  overflow-wrap: anywhere;
+  box-shadow: var(--shadow-2);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--transition), transform var(--transition);
-  z-index: 60;
-  box-shadow: var(--shadow-2);
 }
-.tip:hover::after {
+.tip-bubble[data-dir='top'] {
+  transform: translateY(3px);
+}
+.tip-bubble[data-dir='bottom'] {
+  transform: translateY(-3px);
+}
+.tip-bubble[data-dir='left'] {
+  transform: translateX(3px);
+}
+.tip-bubble[data-dir='right'] {
+  transform: translateX(-3px);
+}
+.tip-bubble.is-on {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: none;
 }
 
 /* ---------- 动效降级 ---------- */

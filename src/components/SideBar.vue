@@ -135,7 +135,7 @@ async function onDropFolder(e: DragEvent, folder: Folder): Promise<void> {
     <div class="folders">
       <div class="sec-head">
         <span class="sec-title">{{ t('sidebar.folders') }}</span>
-        <button class="btn btn-ghost btn-icon btn-sm tip" type="button" :data-tip="t('list.newFolder')" @click="newFolder">
+        <button class="btn btn-ghost btn-icon btn-sm" type="button" v-tip="t('list.newFolder')" @click="newFolder">
           <Icon name="plus" :size="14" />
         </button>
       </div>
