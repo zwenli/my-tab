@@ -4,7 +4,7 @@
  * 图形语义：一张被「折叠收拢」的列表 —— 深色圆角底 + 三条长度递减的浅色横条。
  * 输出：public/icons/icon{16,32,48,128}.png
  *
- * 用法：npm run icons
+ * 用法：pnpm icons
  */
 import { deflateSync } from 'node:zlib'
 import { mkdirSync, writeFileSync } from 'node:fs'

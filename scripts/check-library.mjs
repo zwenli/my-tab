@@ -13,10 +13,10 @@
  *   4. 设置页卡片说的是「已绑定…确认一次即可」，而不是「尚未连接资料库」
  *
  * 用法（三个终端）：
- *   npm run build && npm run demo
+ *   pnpm build && pnpm demo
  *   npx vite preview --port 4173 --strictPort
  *   chrome --headless=new --remote-debugging-port=9222 --user-data-dir=<临时目录>
- *   npm run check:library
+ *   pnpm check:library
  *
  * 桩说明：indexedDB 是只读属性，必须用 Object.defineProperty 覆盖；
  * 桩里的句柄只有 name / queryPermission / requestPermission，

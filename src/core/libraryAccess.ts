@@ -1,5 +1,5 @@
 /**
- * 资料库访问状态判定（纯函数，不碰 DOM / IndexedDB，可被 selftest 直接引用）。
+ * 资料库访问状态判定（纯函数，不碰 DOM / IndexedDB，可被 vitest 直接引用）。
  *
  * 为什么要把 `needs-grant` 单独列出来：
  * Chrome 对 File System Access 的授权是**按会话**的 —— 关掉这个来源的最后一批标签页

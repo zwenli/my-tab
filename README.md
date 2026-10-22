@@ -2,7 +2,7 @@
 
 > 一键把「打开过多的标签页」折叠成一张可管理的列表，释放内存、减少杂乱；需要时再逐个或整体还原。
 
-基于 **Vue 3 + Composition API + Vite + Manifest V3** 完整实现 [`docs/功能说明.md`](docs/功能说明.md) 描述的全部功能。
+基于 **Vue 3 + Composition API + Vite 8 + Manifest V3** 完整实现 [`docs/功能说明.md`](docs/功能说明.md) 描述的全部功能。
 
 架构遵循 **File over app** 理念：**资料库就是一个普通文件夹，里面的 `.json` 文件是唯一真相源**，用任何编辑器都能打开；`chrome.storage.local` 只是可随时重建的缓存。同步交给 OneDrive，不需要「导出/备份」功能。详见 [`docs/File-over-app-重构说明.md`](docs/File-over-app-重构说明.md)。
 
@@ -11,11 +11,13 @@
 ## 一、快速开始
 
 ```bash
-npm install          # 安装依赖
-npm run icons        # 生成扩展图标（已生成，改设计时再跑）
-npm run build        # 产出 dist/ —— 可直接加载的扩展目录
-npm run selftest     # 运行核心逻辑自检（58 项）
+pnpm install         # 安装依赖（包管理与锁文件统一用 pnpm）
+pnpm icons           # 生成扩展图标（已生成，改设计时再跑）
+pnpm build           # 产出 dist/ —— 可直接加载的扩展目录
+pnpm test            # 运行核心逻辑单测（Vitest，58 项）
 ```
+
+> Node 要求 **≥ 22.12**（Vite 8 / Vitest 5 的下限）。仓库已声明 `packageManager: pnpm@10`，用 `corepack enable` 可自动对齐版本。
 
 ### 在浏览器中安装
 
@@ -27,7 +29,7 @@ npm run selftest     # 运行核心逻辑自检（58 项）
 ### 开发模式
 
 ```bash
-npm run dev          # vite build --watch，改动自动重建
+pnpm dev             # vite build --watch，改动自动重建
 ```
 
 改完在 `chrome://extensions` 里点一次扩展卡片上的「刷新」即可生效。
@@ -35,9 +37,8 @@ npm run dev          # vite build --watch，改动自动重建
 ### 本地预览界面（不用装扩展）
 
 ```bash
-npx vite preview --port 4173
-node scripts/make-demo-page.mjs                       # 生成 dist/__demo.html（样例数据）
-node scripts/make-ui-harness.mjs                      # 生成 dist/__ui.html（交互演示外壳）
+pnpm preview                                          # 等价于 vite preview --port 4173
+pnpm demo                                             # 生成 dist/__demo.html + dist/__ui.html
 ```
 
 普通浏览器下数据会自动回退到 `localStorage`，因此界面可以独立预览与截图验收：
@@ -48,7 +49,7 @@ node scripts/make-ui-harness.mjs                      # 生成 dist/__ui.html（
 - `http://[::1]:4173/__ui.html#share` — 分享弹窗
 - `http://[::1]:4173/options.html#backup` — 设置页深链（`#collect` / `#backup` / `#data` …）
 
-> `dist/` 里以 `__` 开头的文件都是本地验收用的临时页，`npm run build` 会清空重建。
+> `dist/` 里以 `__` 开头的文件都是本地验收用的临时页，`pnpm build` 会清空重建。
 
 ---
 
@@ -58,7 +59,9 @@ node scripts/make-ui-harness.mjs                      # 生成 dist/__ui.html（
 |---|---|---|
 | UI 框架 | Vue 3.5（全部使用 `<script setup>` 组合式 API） | 无 Options API，无 class 组件 |
 | 状态 | Pinia | `stores/data.js` 镜像持久化状态，`stores/ui.js` 管界面态 |
-| 构建 | Vite 5 + `@vitejs/plugin-vue` | 多 HTML 入口 + Service Worker 独立入口 |
+| 构建 | Vite 8（Rolldown 内核）+ `@vitejs/plugin-vue` 6 | 多 HTML 入口 + Service Worker 独立入口 |
+| 包管理 | pnpm 10（`pnpm-lock.yaml` 为唯一锁文件） | 依赖隔离，避免幽灵依赖 |
+| 单测 | Vitest 5（node 环境，零 DOM） | `tests/*.test.ts` 按领域拆分，`pnpm test` |
 | 存储 | **资料库文件夹（真相源）+ `chrome.storage.local` 缓存** | 普通浏览器自动回退 `localStorage` 作为缓存 |
 | 二维码 | `qrcode-generator` | 纯 JS、无网络、SVG 输出 |
 | 样式 | 原生 CSS + CSS 变量 | 无 UI 框架，主题切换只切 `data-theme` |
@@ -216,23 +219,39 @@ my-tab/
 
 ---
 
-## 八、自检
+## 八、测试
 
-`npm run selftest` 覆盖 58 项，全部通过：
+### 单元测试（Vitest）
 
-- 数据模型：结构完整性、脏数据归一化、坏数据丢弃、非法枚举回落
-- 变更操作：收集过滤与去重、组合并、跨组迁移、锁定保护、任务三态、快捷列表去重、文件夹删除回落、清空保留锁定组、清理空组、统计
-- **资料库文件格式**：状态 ⇄ 文件集往返、人可读 JSON（键排序 / ISO 时间 / 省略默认值）、手写与改名文件识别、`groupOrder` 排序、冲突副本识别、文件名清洗
-- 检索：标题/域名命中、多词元 AND、URL 匹配开关、**组名与备注命中分组**（组内条目命中不算分组命中）、默认组名可搜
-- 导出导入：文本往返等价、书签 HTML 转义
-- 分享：压缩载荷往返、独立页面自包含且防注入、纯文本与链接清单
+`pnpm test` 覆盖 58 项，全部通过。用例按领域拆到 `tests/`，与 `src/core` 的纯函数一一对应：
 
-浏览器侧另有三个无头 Chromium 验收脚本（需 `npm run build && npm run demo` + `vite preview` + 无头 Chrome 9222）：
+| 文件 | 覆盖内容 |
+|---|---|
+| `tests/model.test.ts` | 数据模型：结构完整性、脏数据归一化、坏数据丢弃、非法枚举回落、默认组名 |
+| `tests/mutations.test.ts` | 变更操作：收集过滤与去重、组合并、跨组迁移、锁定保护、任务三态、快捷列表、文件夹回落、清空与清理、统计与徽标 |
+| `tests/library-format.test.ts` | 资料库文件格式：状态 ⇄ 文件集往返、人可读 JSON（键排序 / ISO 时间 / 省略默认值）、手写与改名文件识别、`groupOrder` 排序、冲突副本识别、文件名清洗 |
+| `tests/search.test.ts` | 检索：标题/域名命中、多词元 AND、URL 匹配开关、组名与备注命中分组（组内条目命中不算）、默认组名可搜 |
+| `tests/export-import.test.ts` | 导出导入：文本往返等价、书签 HTML 转义 |
+| `tests/share.test.ts` | 分享：压缩载荷往返、独立页面自包含且防注入、纯文本与链接清单 |
+| `tests/drag-order.test.ts` | 拖拽排序数学：插入点、可视视图重排、星标夹取、命中判定 |
+| `tests/tip-geometry.test.ts` | 提示气泡方向与坐标夹取 |
+| `tests/library-access.test.ts` | 资料库访问等级与「轻量恢复」判定 |
 
 ```bash
-npm run check:dnd       # 18 项：拖拽排序 / 合并 / 插入线
-npm run check:library   # 16 项：重启后资料库授权恢复
-npm run check:search    # 21 项：组名检索、点分组定位、#g= 直达、空结果文案
+pnpm test            # 单次运行
+pnpm test:watch      # 监视模式
 ```
+
+### 浏览器验收（无头 Chromium + CDP）
+
+交互类问题单测管不到（事件顺序、状态残留），由三个脚本兜底。前提：`pnpm build && pnpm demo` + `pnpm preview` + 无头 Chrome 9222。
+
+```bash
+pnpm check:dnd       # 18 项：拖拽排序 / 合并 / 插入线
+pnpm check:library   # 16 项：重启后资料库授权恢复
+pnpm check:search    # 21 项：组名检索、点分组定位、#g= 直达、空结果文案
+```
+
+> 三个脚本共用同一个 CDP page target，**不要并行跑**，否则会互相踩状态。
 
 界面侧另用无头 Chromium 走查了列表页（深/浅色、中/英）、多选态、分享弹窗、输入弹窗、下拉菜单、设置页各分区与分享落地页。

@@ -2,7 +2,7 @@
  * 提示气泡的定位几何。
  *
  * 这里只做「给定触发元素矩形 + 气泡尺寸 + 视口尺寸 → 方向与坐标」的纯计算，
- * 不碰 DOM，因此可以直接在 Node 里单测（scripts/selftest.ts）。
+ * 不碰 DOM，因此可以直接在 Node 里单测（tests/tip-geometry.test.ts）。
  */
 
 export type TipDir = 'auto' | 'top' | 'bottom' | 'left' | 'right'

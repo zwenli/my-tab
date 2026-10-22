@@ -29,10 +29,12 @@ function copyManifest(): Plugin {
  *   dist/manifest.json、dist/list.html、dist/popup.html、dist/assets/background.js
  *
  * 关键点：
- * - background service worker 作为独立 rollup 入口，固定输出为 assets/background.js，
+ * - background service worker 作为独立入口，固定输出为 assets/background.js，
  *   manifest 里用 "type": "module" 直接引用它。
  * - 关闭 hash 化的入口文件名，保证 manifest 引用稳定。
  * - 关闭 modulePreload 的 polyfill 内联，避免 MV3 CSP 下的内联脚本问题。
+ * - Vite 8 起打包内核换成 Rolldown，`build.rollupOptions` 已标记废弃，
+ *   这里统一用 `build.rolldownOptions`（选项形状与原先一致）。
  */
 export default defineConfig({
   plugins: [vue(), copyManifest()],
@@ -48,7 +50,7 @@ export default defineConfig({
     modulePreload: { polyfill: false },
     cssCodeSplit: true,
     sourcemap: false,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         list: fileURLToPath(new URL('./list.html', import.meta.url)),
         popup: fileURLToPath(new URL('./popup.html', import.meta.url)),

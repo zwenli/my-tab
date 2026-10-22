@@ -9,7 +9,7 @@
  *   5. 弹窗不再把组名当搜索词（源码级回归护栏）
  *
  * 用法（三个终端）：
- *   npm run build && npm run demo
+ *   pnpm build && pnpm demo
  *   npx vite preview --port 4173 --strictPort
  *   chrome --headless=new --remote-debugging-port=9222 --user-data-dir=<临时目录>
  *   node scripts/check-search.mjs
@@ -141,7 +141,7 @@ const main = async () => {
   await goto()
   const ok = await evaluate(`window.__s.type('调研')`)
   if (!ok) {
-    console.log('找不到搜索框，请确认已执行 npm run build && npm run demo')
+    console.log('找不到搜索框，请确认已执行 pnpm build && pnpm demo')
     process.exit(1)
   }
   await sleep(400)

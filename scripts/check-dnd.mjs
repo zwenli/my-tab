@@ -9,10 +9,10 @@
  *   5. 星标置顶时插入点是否被夹在所属分段内（否则线画的位置和结果不一致）
  *
  * 用法（三个终端）：
- *   npm run build && npm run demo
- *   npx vite preview --port 4173 --strictPort
+ *   pnpm build && pnpm demo
+ *   pnpm preview
  *   chrome --headless=new --remote-debugging-port=9222 --user-data-dir=<临时目录>
- *   npm run check:dnd
+ *   pnpm check:dnd
  */
 import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -143,7 +143,7 @@ const main = async () => {
   /* ---------------- 星标置顶开启 ---------------- */
   let n = await goto(true)
   if (!n) {
-    console.log('页面没有渲染出卡片，请确认已执行 npm run build && npm run demo')
+    console.log('页面没有渲染出卡片，请确认已执行 pnpm build && pnpm demo')
     process.exit(1)
   }
   const titles1 = await evaluate(`window.__dnd.titles()`)
