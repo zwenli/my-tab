@@ -39,6 +39,8 @@ const actions = useActions()
 const collapsed = computed<boolean>(() => !!props.group.collapsed)
 const isDropTarget = computed<boolean>(() => ui.dropTarget?.kind === 'group' && ui.dropTarget.id === props.group.id)
 const isDragSource = computed<boolean>(() => ui.drag?.kind === 'group' && ui.drag.id === props.group.id)
+/** 拖进来的是标签（收进此组）还是整组（合并）—— 提示文案据此区分 */
+const incomingTab = computed<boolean>(() => ui.drag?.kind === 'tab')
 
 const displayTitle = computed<string>(() => props.group.title || t('group.untitled'))
 
@@ -134,6 +136,10 @@ function onMore(key: string): void | Promise<void> | Promise<unknown> | undefine
 }
 
 function onDragStart(e: DragEvent): void {
+  // dragstart 会从条目行冒泡上来（.row 自己也是 draggable）。若不管这个，
+  // 卡片会把 TabRow 写好的 {kind:'tab'} 覆盖成 {kind:'group'}，
+  // 于是「拖一条标签」变成「拖整个组去合并」——这就是历史上两者手感一样的根因。
+  if ((e.target as Element | null)?.closest?.('[data-item-id]')) return
   ui.drag = { kind: 'group', id: props.group.id, index: props.index }
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'move'
@@ -148,27 +154,10 @@ function onDragEnd(e: DragEvent): void {
 }
 
 /**
- * 只处理「标签拖进本组」。
- * 组的排序 / 合并落点由列表页画布统一判定（见 pages/list/App.vue），
- * 卡片不再抢 dragover，否则两条判定线会互相打架，导致想排序却合并。
+ * 卡片不处理 drop：整张卡片的落点都由列表页画布统一判定（见 pages/list/App.vue）。
+ * 拖标签落在组体内出「条目级插入线」，落在标题栏才是「收进此组」；
+ * 拖组落在中间带是合并。这些判定必须只有一个来源，否则「想排序却合并」。
  */
-async function onDrop(e: DragEvent): Promise<void> {
-  const drag = ui.drag
-  if (!drag || drag.kind !== 'tab') return
-  e.preventDefault()
-  e.stopPropagation()
-  ui.resetDrag()
-
-  if (drag.groupId === props.group.id) return
-  if (props.group.locked) {
-    ui.toast(t('group.lockedDrop'), 'warning')
-    return
-  }
-  const ids = ui.isItemSelected(drag.id) ? ui.selectedIds : [drag.id]
-  await data.moveItemsToGroup(ids, props.group.id, -1)
-  ui.clearSelection()
-  ui.toast(t('toast.moved'), 'success')
-}
 
 async function onItemRemove(item: TabItem): Promise<void> {
   ui.openDialog('confirm', {
@@ -199,7 +188,6 @@ function toggleSelect(): void {
     :draggable="!selectable"
     @dragstart="onDragStart"
     @dragend="onDragEnd"
-    @drop="onDrop"
   >
     <header class="head">
       <label v-if="selectable" class="check" @click.stop>
@@ -225,7 +213,10 @@ function toggleSelect(): void {
       </div>
 
       <div class="badges">
-        <span v-if="isDropTarget && collapsed" class="merge-chip"><Icon name="layers" :size="11" />{{ t('group.mergeTarget') }}</span>
+        <span v-if="isDropTarget && (collapsed || incomingTab)" class="merge-chip">
+          <Icon :name="incomingTab ? 'corner-down-right' : 'layers'" :size="11" />
+          {{ incomingTab ? t('group.appendTarget') : t('group.mergeTarget') }}
+        </span>
         <Icon v-if="group.locked" name="lock" :size="13" class="b-lock" :aria-label="t('group.lock')" />
         <Icon v-if="group.starred" name="star" :size="13" class="b-star" filled :aria-label="t('group.star')" />
       </div>
@@ -255,7 +246,7 @@ function toggleSelect(): void {
 
     <p v-if="group.note && !collapsed" class="note">{{ group.note }}</p>
 
-    <div v-if="!collapsed" class="body">
+    <div v-if="!collapsed" class="body" data-group-body>
       <ul class="items">
         <TabRow
           v-for="(it, i) in group.items"
@@ -273,9 +264,9 @@ function toggleSelect(): void {
         />
       </ul>
       <p v-if="!group.items.length" class="empty-items">{{ t('common.empty') }}</p>
-      <div v-if="isDropTarget" class="drop-hint">
-        <Icon :name="ui.drag?.kind === 'group' ? 'layers' : 'corner-down-right'" :size="14" />
-        <span>{{ ui.drag?.kind === 'group' ? t('group.mergeHint') : t('common.add') }}</span>
+      <div v-if="isDropTarget && !incomingTab" class="drop-hint">
+        <Icon name="layers" :size="14" />
+        <span>{{ t('group.mergeHint') }}</span>
       </div>
     </div>
   </article>

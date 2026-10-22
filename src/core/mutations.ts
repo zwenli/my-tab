@@ -333,45 +333,70 @@ export function moveItemInGroup(state: MyTabState, groupId: string, from: number
   return { state: touch(state) }
 }
 
-/** 跨组移动：把 itemId 移到 targetGroupId 的 index 位置 */
-export function moveItemToGroup(state: MyTabState, itemId: string, targetGroupId: string, index = -1): MutationOutcome {
-  const hit = findItem(state, itemId)
-  const target = findGroup(state, targetGroupId)
-  if (!hit || !target || target.locked || hit.group?.locked) return { state }
-  if (hit.group) hit.group.items = hit.group.items.filter((i) => i.id !== itemId)
-  const moved: TabItem = { ...hit.item, updatedAt: now() }
-  if (index < 0 || index >= target.items.length) target.items.push(moved)
-  else target.items.splice(index, 0, moved)
-  if (hit.group) hit.group.updatedAt = now()
-  target.updatedAt = now()
-  return { state: touch(state) }
-}
-
-/** 批量移动到另一个组 */
+/**
+ * 把条目移动到目标组的第 index 条之前；index < 0 / 越界 → 追加到末尾。
+ *
+ * `index` 的语义是「拖拽时那条插入线画在**移动前**数组的第 index 条上方」，
+ * 所以先记下锚点条目、再把条目从原组摘掉、最后插到锚点前面 ——
+ * 这样同组内上下拖动都不会因为「自己被先摘走」而错位（历史上就是这里跑偏）。
+ * 锚点本身也在移动（多选）时，落点顺延到它后面第一条留下的条目。
+ */
 export function moveItemsToGroup(state: MyTabState, itemIds: string[] = [], targetGroupId: string, index = -1): MutationOutcome {
   const target = findGroup(state, targetGroupId)
   if (!target || target.locked) return { state }
   const ids = new Set(itemIds)
-  const picked: TabItem[] = []
+  if (!ids.size) return { state }
 
+  let anchorId = ''
+  if (index >= 0) {
+    for (let i = index; i < target.items.length; i++) {
+      const id = target.items[i]!.id
+      if (!ids.has(id)) {
+        anchorId = id
+        break
+      }
+    }
+  }
+
+  // 先在副本上算好，确认真有变化才落地（拖回原位不该产生写盘）
+  const plans: { group: Group; items: TabItem[] }[] = []
+  const picked: TabItem[] = []
   for (const g of state.groups) {
-    if (g.locked || g.id === targetGroupId) continue
+    if (g.locked) continue
     const keep: TabItem[] = []
     for (const it of g.items) {
       if (ids.has(it.id)) picked.push(it)
       else keep.push(it)
     }
-    if (keep.length !== g.items.length) {
-      g.items = keep
-      g.updatedAt = now()
-    }
+    if (keep.length !== g.items.length) plans.push({ group: g, items: keep })
   }
   if (!picked.length) return { state }
-  if (index < 0 || index >= target.items.length) target.items.push(...picked)
-  else target.items.splice(index, 0, ...picked)
-  target.updatedAt = now()
+
+  const plan = plans.find((p) => p.group.id === targetGroupId)
+  const rest = plan ? plan.items : target.items
+  const found = anchorId ? rest.findIndex((i) => i.id === anchorId) : -1
+  const at = found >= 0 ? found : rest.length
+  const next = [...rest.slice(0, at), ...picked, ...rest.slice(at)]
+
+  const unchanged =
+    plans.length === 1 &&
+    next.length === target.items.length &&
+    next.every((it, i) => it.id === target.items[i]!.id)
+  if (unchanged) return { state }
+
+  const ts = now()
+  for (const p of plans) {
+    p.group.items = p.items
+    p.group.updatedAt = ts
+  }
+  target.items = next
+  target.updatedAt = ts
   return { state: touch(state) }
 }
+
+/** 单条移动到另一个组（批量实现已覆盖同组排序，这里只做转发） */
+export const moveItemToGroup = (state: MyTabState, itemId: string, targetGroupId: string, index = -1): MutationOutcome =>
+  moveItemsToGroup(state, [itemId], targetGroupId, index)
 
 /** 批量移动到文件夹 */
 export function moveGroupsToFolder(state: MyTabState, groupIds: string[] = [], folderId: string | null = null): MutationOutcome {

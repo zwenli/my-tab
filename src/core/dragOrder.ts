@@ -88,7 +88,7 @@ export function hitTest(opts: HitOptions): DropHit {
   const n = tops.length
 
   if (mergeAnyBand) {
-    // 标签拖拽：整张卡片（含相邻间隙）都是目标，取距离最近的一张
+    // 卡片级吸附（标签拖拽的兜底）：整张卡片含相邻间隙都是目标，取距离最近的一张
     let best = -1
     let bestDist = snap + 1
     for (let i = 0; i < n; i++) {
@@ -115,4 +115,46 @@ export function hitTest(opts: HitOptions): DropHit {
     }
   }
   return { index: n, mergeIndex: -1 }
+}
+
+/* ---------------------------- 标签条目 ---------------------------- */
+
+/** 一组条目的落点区域：组体上下边界 + 组内各行的垂直中线（升序） */
+export interface ItemZone {
+  groupId: string
+  top: number
+  bottom: number
+  centers: readonly number[]
+}
+
+export interface ItemDrop {
+  groupId: string
+  /** 插入点：插到组内第 index 条之前；index === 条目数 表示插到末尾 */
+  index: number
+}
+
+/**
+ * 标签拖拽的落点判定：先挑指针所在的条目区域（含少量吸附吃掉行间空隙），
+ * 再按行中线决定插到第几条之前 —— 同组内就是排序，跨组就是「移动并插入」。
+ *
+ * 只认组体（条目区域）：标题栏、收起卡片不算条目落点，那是「收进此组」，
+ * 由调用方在没有命中时退回卡片级手势（见 hitTest 的 mergeAnyBand）。
+ */
+export function itemHitTest(zones: readonly ItemZone[], clientY: number, snap = 6): ItemDrop | null {
+  let best: ItemZone | null = null
+  let bestDist = snap + 1
+  for (const z of zones) {
+    const d = clientY < z.top ? z.top - clientY : clientY > z.bottom ? clientY - z.bottom : 0
+    if (d < bestDist) {
+      bestDist = d
+      best = z
+    }
+  }
+  if (!best) return null
+
+  // 行中线在指针上方 → 这条留在指针前面，插入点顺延；
+  // 正好压在中线上算「在它前面」，保证指针不动时落点稳定（不会在 ±0.5px 之间来回跳）
+  let index = 0
+  while (index < best.centers.length && clientY > (best.centers[index] as number)) index++
+  return { groupId: best.groupId, index }
 }

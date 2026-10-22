@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyVisibleOrder, clampPinnedIndex, hitTest, moveToInsertPoint, sameOrder } from '@/core/dragOrder'
+import { applyVisibleOrder, clampPinnedIndex, hitTest, itemHitTest, moveToInsertPoint, sameOrder } from '@/core/dragOrder'
 
 describe('拖拽排序', () => {
   it('拖到第一位：插到最前，而不是跑到末尾', () => {
@@ -78,5 +78,37 @@ describe('拖拽排序', () => {
     expect(tabHit(105), '间隙吸附到上一张，不会闪成「新建组」').toEqual({ index: -1, mergeIndex: 0 })
     expect(tabHit(300)).toEqual({ index: -1, mergeIndex: 2 })
     expect(tabHit(400), '离所有卡片都远 → 空白处，新建组').toEqual({ index: -1, mergeIndex: -1 })
+  })
+})
+
+describe('拖标签的条目级落点', () => {
+  // 两组：A 组体 100~190（3 行，中线 120/150/180），B 组体 300~340（2 行，中线 310/330）
+  const zones = [
+    { groupId: 'A', top: 100, bottom: 190, centers: [120, 150, 180] },
+    { groupId: 'B', top: 300, bottom: 340, centers: [310, 330] }
+  ]
+
+  it('按行中线判断插到第几条之前', () => {
+    expect(itemHitTest(zones, 105), '第一条上半 → 插到最前').toEqual({ groupId: 'A', index: 0 })
+    expect(itemHitTest(zones, 125), '过了第一条中线 → 插到第二条前').toEqual({ groupId: 'A', index: 1 })
+    expect(itemHitTest(zones, 160)).toEqual({ groupId: 'A', index: 2 })
+    expect(itemHitTest(zones, 185), '最后一条下半 → 插到末尾').toEqual({ groupId: 'A', index: 3 })
+    expect(itemHitTest(zones, 335), '落到另一组 → 组内下标另算').toEqual({ groupId: 'B', index: 2 })
+  })
+
+  it('正好压在中线上算「在它前面」（同一坐标反复 dragover 不会左右横跳）', () => {
+    expect(itemHitTest(zones, 120)).toEqual({ groupId: 'A', index: 0 })
+    expect(itemHitTest(zones, 150)).toEqual({ groupId: 'A', index: 1 })
+    expect(itemHitTest(zones, 120.5)).toEqual({ groupId: 'A', index: 1 })
+  })
+
+  it('组体上下各留一点吸附，行间空隙不会闪成「新建组」', () => {
+    expect(itemHitTest(zones, 195)).toEqual({ groupId: 'A', index: 3 })
+    expect(itemHitTest(zones, 296)).toEqual({ groupId: 'B', index: 0 })
+    expect(itemHitTest(zones, 230), '两组之间的大空隙 → 不算条目落点').toBe(null)
+  })
+
+  it('空组：任何位置都插到第 0 条', () => {
+    expect(itemHitTest([{ groupId: 'E', top: 0, bottom: 40, centers: [] }], 20)).toEqual({ groupId: 'E', index: 0 })
   })
 })

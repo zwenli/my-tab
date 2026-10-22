@@ -21,7 +21,7 @@ import { useI18n } from '@/composables/useI18n'
 import { useActions } from '@/composables/useActions'
 import { useLibraryAutoRestore } from '@/composables/useLibraryAccess'
 import { useTheme } from '@/composables/useTheme'
-import { applyVisibleOrder, clampPinnedIndex, hitTest, moveToInsertPoint, sameOrder } from '@/core/dragOrder'
+import { applyVisibleOrder, clampPinnedIndex, hitTest, itemHitTest, moveToInsertPoint, sameOrder } from '@/core/dragOrder'
 import type { Group, TabItem } from '@/types'
 
 const data = useDataStore()
@@ -37,6 +37,10 @@ useLibraryAutoRestore()
 const canvas = ref<HTMLElement | null>(null)
 const dropIndex = ref<number>(-1)
 const canvasHint = ref<boolean>(false)
+/** 条目级插入线：插到 groupId 组的第 index 条之前，y 是相对画布的纵坐标 */
+const itemDrop = ref<{ groupId: string; index: number; y: number } | null>(null)
+/** 指针停在一个锁定组上（松手给提示，而不是静默无反应） */
+const lockedTargetId = ref<string>('')
 
 /* ------------------------- 定位高亮 -------------------------
  *
@@ -119,19 +123,25 @@ const showFavicons = computed<boolean>(() => data.settings.showFavicons !== fals
 
 /* ------------------------- 拖拽 -------------------------
  *
- * 拖拽状态分成三份，职责单一：
- *   ui.drag        —— 谁在被拖（由 TabRow / GroupCard 在 dragstart 写入）
- *   ui.dropTarget  —— 合并目标组（只有落在卡片「中间窄带」才是合并）
- *   dropIndex      —— 排序线位置（落在卡片上/下段或卡片之间的空隙）
+ * 三种手势，落点判定**只在画布**做（dragover 会从卡片冒泡上来），卡片自身不抢事件，
+ * 这样两个判定永远只有一个生效，不会互相打架：
  *
- * 判定统一放在画布上（dragover 会从卡片冒泡上来），卡片自身不再抢事件，
- * 这样「排序」和「合并」永远只有一个生效，不会互相打架。
- * 排序线用 height:0 + 负 margin 画，出现时不挤动卡片，避免判定抖动。
+ *   拖组   → 卡片上/下 30% 出「组级排序线」，中间 40% 合并整组
+ *   拖标签 → 组体（条目区域）内出「条目级插入线」：
+ *              同组内拖动 = 组内排序；拖到别组 = 移动并插到该位置
+ *            卡片标题栏 / 收起卡片 = 「收进此组」（追加到末尾）
+ *   空白处 → 新建组
+ *
+ * 这是拖标签与拖组最本质的区别：拖组只有组级的线，拖标签在组体内是条目级的线；
+ * 两者互斥，同一帧只有一条线，所以「想排序却合并」不会再出现。
+ *
+ * 两条线都不占布局：组级线用 height:0 + 负 margin，条目级线是绝对定位，
+ * 出现时卡片不位移，命中判定的坐标就是稳定的，不会「线来回跳」。
  */
 
 /** 卡片上下各留 30% 给排序，中间 40% 才合并 —— 排序区更大，减少误触 */
 const REORDER_ZONE = 0.3
-/** 标签拖拽时对卡片边缘的吸附容差，吃掉卡片之间 10px 的间隙 */
+/** 标签拖拽时的吸附容差，吃掉卡片之间 10px 的间隙与 1px 的行间距 */
 const TAB_SNAP = 6
 
 const isDraggingTab = computed<boolean>(() => ui.drag?.kind === 'tab')
@@ -163,9 +173,47 @@ function cardBoxes(): CardBox[] {
   })
 }
 
+/** 条目级落点区域：只有展开且未锁定的组有组体（组体 = 条目列表所在区域） */
+interface ItemZoneBox {
+  groupId: string
+  top: number
+  bottom: number
+  rows: { top: number; bottom: number }[]
+}
+
+function itemZoneBoxes(): ItemZoneBox[] {
+  const el = canvas.value
+  if (!el) return []
+  const out: ItemZoneBox[] = []
+  for (const card of el.querySelectorAll<HTMLElement>('[data-group-id]')) {
+    const id = card.dataset.groupId || ''
+    if (!id || lockedIds.value.has(id)) continue
+    const body = card.querySelector<HTMLElement>('[data-group-body]')
+    if (!body) continue
+    const r = body.getBoundingClientRect()
+    if (r.height <= 0) continue
+    const rows = [...body.querySelectorAll<HTMLElement>('[data-item-id]')].map((node) => {
+      const rr = node.getBoundingClientRect()
+      return { top: rr.top, bottom: rr.bottom }
+    })
+    out.push({ groupId: id, top: r.top, bottom: r.bottom, rows })
+  }
+  return out
+}
+
+/** 条目插入线的纵坐标（相对画布，便于绝对定位），落在第 index 条的上边缘 */
+function itemLineY(zone: ItemZoneBox, index: number): number {
+  const top = canvas.value?.getBoundingClientRect().top ?? 0
+  const last = zone.rows[zone.rows.length - 1]
+  const boundary = index < zone.rows.length ? zone.rows[index]!.top : last ? last.bottom : zone.top + 2
+  return boundary - top - 1
+}
+
 function clearDropMarks(): void {
   dropIndex.value = -1
   canvasHint.value = false
+  itemDrop.value = null
+  lockedTargetId.value = ''
   if (ui.dropTarget?.kind === 'group') ui.dropTarget = null
 }
 
@@ -190,23 +238,27 @@ function onCanvasDragOver(e: DragEvent): void {
   const boxes = cardBoxes()
   const tops = boxes.map((b) => b.top)
   const bottoms = boxes.map((b) => b.bottom)
-  const from = drag.kind === 'group' ? boxes.findIndex((b) => b.id === drag.id) : -1
+  if (drag.kind === 'tab') {
+    dragTabOver(e, boxes, tops, bottoms)
+    return
+  }
 
+  const from = boxes.findIndex((b) => b.id === drag.id)
   const hit = hitTest({
     tops,
     bottoms,
     clientY: e.clientY,
     zone: REORDER_ZONE,
-    mergeAnyBand: drag.kind === 'tab',
-    snap: TAB_SNAP,
     // 自己不能合并到自己；锁定组不收外来内容
     canMerge: (i) => {
       const box = boxes[i]
       if (!box || !box.id) return false
-      if (drag.kind === 'group' && box.id === drag.id) return false
-      return !lockedIds.value.has(box.id)
+      return box.id !== drag.id && !lockedIds.value.has(box.id)
     }
   })
+
+  itemDrop.value = null
+  lockedTargetId.value = ''
 
   if (hit.mergeIndex >= 0) {
     setMergeTarget(boxes[hit.mergeIndex]?.id || '')
@@ -217,19 +269,58 @@ function onCanvasDragOver(e: DragEvent): void {
 
   setMergeTarget('')
 
-  if (drag.kind === 'tab') {
-    // 标签拖拽只关心「落在卡片上（交给卡片处理）」还是「落在空白处（新建组）」
-    dropIndex.value = -1
-    canvasHint.value = !boxes.some((b) => e.clientY >= b.top - TAB_SNAP && e.clientY <= b.bottom + TAB_SNAP)
-    return
-  }
-
   // 落回自己身上等于没动，不画线，避免「线在自己头上」的困惑；
-  // 星标置顶时把落点夹在本组所属的那一段，线画在哪就落在哪
+  // 星标置顶时把落点夹在本组所属那一段，线画在哪就落在哪
   const target = clampPinnedIndex(hit.index, from, pinnedCount.value)
   const noop = from >= 0 && (target === from || target === from + 1)
   dropIndex.value = noop ? -1 : target
   canvasHint.value = false
+}
+
+/** 拖标签的落点：条目区域 > 卡片（收进此组）> 空白（新建组），三选一 */
+function dragTabOver(e: DragEvent, boxes: CardBox[], tops: number[], bottoms: number[]): void {
+  dropIndex.value = -1
+
+  const zones = itemZoneBoxes()
+  const hit = itemHitTest(
+    zones.map((z) => ({ groupId: z.groupId, top: z.top, bottom: z.bottom, centers: z.rows.map((r) => (r.top + r.bottom) / 2) })),
+    e.clientY,
+    TAB_SNAP
+  )
+
+  if (hit) {
+    const zone = zones.find((z) => z.groupId === hit.groupId)
+    if (zone) {
+      itemDrop.value = { groupId: hit.groupId, index: hit.index, y: itemLineY(zone, hit.index) }
+      setMergeTarget('')
+      lockedTargetId.value = ''
+      canvasHint.value = false
+      return
+    }
+  }
+
+  itemDrop.value = null
+
+  // 卡片级吸附：标题栏、收起卡片、卡片之间的缝隙都算「收进此组」
+  const near = hitTest({ tops, bottoms, clientY: e.clientY, zone: REORDER_ZONE, mergeAnyBand: true, snap: TAB_SNAP, canMerge: () => true })
+  const card = near.mergeIndex >= 0 ? boxes[near.mergeIndex] : undefined
+
+  if (card) {
+    canvasHint.value = false
+    if (lockedIds.value.has(card.id)) {
+      // 锁定的组不收外来标签：不亮合并态，松手时提示原因
+      setMergeTarget('')
+      lockedTargetId.value = card.id
+      return
+    }
+    lockedTargetId.value = ''
+    setMergeTarget(card.id)
+    return
+  }
+
+  setMergeTarget('')
+  lockedTargetId.value = ''
+  canvasHint.value = true
 }
 
 function onCanvasDragLeave(e: DragEvent): void {
@@ -247,6 +338,8 @@ async function onCanvasDrop(e: DragEvent): Promise<void> {
   const drag = ui.drag
   const insertAt = dropIndex.value
   const mergeId = ui.dropTarget?.kind === 'group' ? ui.dropTarget.id : ''
+  const itemTarget = itemDrop.value
+  const lockedId = lockedTargetId.value
   const blank = canvasHint.value
   ui.resetDrag()
   clearDropMarks()
@@ -263,10 +356,34 @@ async function onCanvasDrop(e: DragEvent): Promise<void> {
     return
   }
 
-  if (drag.kind === 'tab' && blank) {
-    const ids = ui.isItemSelected(drag.id) ? ui.selectedIds : [drag.id]
-    await dropTabsToNewGroup(ids)
+  if (drag.kind !== 'tab') return
+  const ids = ui.isItemSelected(drag.id) ? ui.selectedIds : [drag.id]
+  if (!ids.length) return
+
+  // 落到条目之间：按位置插入（同组 = 排序，跨组 = 移动到该位置）
+  if (itemTarget) {
+    await data.moveItemsToGroup(ids, itemTarget.groupId, itemTarget.index)
+    ui.clearSelection()
+    if (itemTarget.groupId !== drag.groupId) ui.toast(t('toast.moved'), 'success')
+    return
   }
+
+  // 落到标题栏 / 收起卡片：收进此组（追加到末尾）
+  if (mergeId) {
+    // 拖回自己组的标题栏 = 没动，别把条目挪到末尾
+    if (mergeId === drag.groupId && ids.length === 1) return
+    await data.moveItemsToGroup(ids, mergeId, -1)
+    ui.clearSelection()
+    ui.toast(t('toast.moved'), 'success')
+    return
+  }
+
+  if (lockedId) {
+    ui.toast(t('group.lockedDrop'), 'warning')
+    return
+  }
+
+  if (blank) await dropTabsToNewGroup(ids)
 }
 
 /** 标签拖到画布空白处：把这些条目收成一个新组 */
@@ -457,6 +574,8 @@ function collect(): void {
               </template>
               <div v-if="dropIndex === visibleGroups.length" class="drop-line" aria-hidden="true" />
 
+              <div v-if="itemDrop" class="item-line" :style="{ top: `${itemDrop.y}px` }" aria-hidden="true" />
+
               <div v-if="canvasHint" class="canvas-drop">
                 <Icon name="plus" :size="15" />
                 <span>{{ t('group.dropToNew') }}</span>
@@ -554,6 +673,32 @@ function collect(): void {
   background: var(--primary);
   box-shadow: 0 0 0 4px var(--primary-soft);
   animation: fade-in 120ms ease-out;
+}
+/**
+ * 条目级插入线（拖标签）。
+ * 绝对定位：不参与布局，出现时卡片一根手指都不动，命中坐标始终稳定。
+ * 比组级线更细、两端内缩，视觉上明确「插在某两条之间」而不是「整组换位」。
+ */
+.item-line {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+  pointer-events: none;
+  animation: fade-in 100ms ease-out;
+}
+.item-line::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -3.5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--primary);
 }
 .canvas-drop {
   position: absolute;

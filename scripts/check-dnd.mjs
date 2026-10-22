@@ -7,6 +7,8 @@
  *   3. 拖出画布后标记是否立即清除、松手是否不改顺序
  *   4. 卡片上/下段只排序、中间窄带才合并（避免误合并）
  *   5. 星标置顶时插入点是否被夹在所属分段内（否则线画的位置和结果不一致）
+ *   6. 拖标签：组体内是「条目级插入线」（同组排序 / 跨组插入），
+ *      标题栏才是「收进此组」，且两条线互斥（这里最容易退回「一拖就合并」）
  *
  * 用法（三个终端）：
  *   pnpm build && pnpm demo
@@ -43,10 +45,39 @@ window.__dnd = {
     return cards.length;
   },
   targets: () => document.querySelectorAll('.canvas .group.target').length,
+  /** 每组内的条目标题（按显示顺序） */
+  itemRows() {
+    return this.cards().map((card) => ({
+      id: card.dataset.groupId,
+      titles: [...card.querySelectorAll('[data-item-id] .title')].map((n) => n.textContent.trim())
+    }));
+  },
+  /** 第 gi 组第 ii 条的行盒子 */
+  rowRect(gi, ii) {
+    const r = this.cards()[gi].querySelectorAll('[data-item-id]')[ii].getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, mid: (r.top + r.bottom) / 2 };
+  },
+  /** 第 gi 组标题栏（「收进此组」的落点） */
+  headRect(gi) {
+    const r = this.cards()[gi].querySelector('.head').getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, mid: (r.top + r.bottom) / 2 };
+  },
+  /** 条目级插入线 */
+  itemLines: () => document.querySelectorAll('.item-line').length,
   dt: null,
   start(i) {
     this.dt = new DataTransfer();
     this.cards()[i].dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: this.dt }));
+  },
+  /** 开始拖第 gi 组第 ii 条标签 */
+  startItem(gi, ii) {
+    this.dt = new DataTransfer();
+    const row = this.cards()[gi].querySelectorAll('[data-item-id]')[ii];
+    row.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: this.dt }));
+  },
+  endItem(gi, ii) {
+    const row = this.cards()[gi].querySelectorAll('[data-item-id]')[ii] || this.cards()[gi];
+    row.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: this.dt || new DataTransfer() }));
   },
   fire(type, y) {
     const canvas = document.querySelector('.canvas');
@@ -267,6 +298,90 @@ const main = async () => {
   const afterMerge = await evaluate(`({ n: window.__dnd.cards().length, lines: window.__dnd.lines() })`)
   check('中间带松手 → 合并成一组', afterMerge.n === beforeMerge - 1, `${beforeMerge} → ${afterMerge.n}`)
   check('合并后无残留插入线', afterMerge.lines === 0, `lines=${afterMerge.lines}`)
+
+  /* ---------------- 拖标签：组内排序 / 跨组插入 / 收进此组 ---------------- */
+  n = await goto(false)
+  // 视口放大一点，elementFromPoint 才能稳定命中条目行
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false })
+  const items0 = await evaluate(`window.__dnd.itemRows()`)
+  const groupTitles0 = await evaluate(`window.__dnd.titles()`)
+  console.log(`\n[3] 拖标签 · ${items0.map((g) => g.titles.length + '条').join(' / ')}`)
+
+  // 3.1 组内排序：把第 0 组第 4 条拖到第 2 条之前
+  const r1 = await evaluate(`window.__dnd.rowRect(0, 1)`)
+  await evaluate(`window.__dnd.startItem(0, 3)`)
+  await evaluate(`window.__dnd.over(${r1.mid})`)
+  await sleep(140)
+  const inner = await evaluate(`({ item: window.__dnd.itemLines(), group: window.__dnd.lines(), targets: window.__dnd.targets() })`)
+  check('拖标签到条目之间 → 只有条目级插入线', inner.item === 1 && inner.group === 0 && inner.targets === 0, JSON.stringify(inner))
+  // 插入线出现时卡片不能位移（否则命中判定会抖）
+  const rowTop0 = await evaluate(`window.__dnd.rowRect(0, 1).top`)
+  check('条目插入线不挤动行', Math.abs(rowTop0 - r1.top) < 1, `${r1.top} → ${rowTop0}`)
+
+  await evaluate(`window.__dnd.drop(${r1.mid})`)
+  await evaluate(`window.__dnd.tick()`)
+  await sleep(250)
+  await evaluate(`window.__dnd.endItem(0, 0)`)
+  const afterInner = await evaluate(`window.__dnd.itemRows()`)
+  const expectInner = [items0[0].titles[0], items0[0].titles[3], items0[0].titles[1], items0[0].titles[2], ...items0[0].titles.slice(4)]
+  check('组内拖拽排序落点正确', afterInner[0].titles.join('|') === expectInner.join('|'), afterInner[0].titles.join(' | '))
+  check('组内排序不改变条数', afterInner[0].titles.length === items0[0].titles.length)
+  check('松手后条目插入线消失', (await evaluate(`window.__dnd.itemLines()`)) === 0)
+
+  // 3.2 跨组插入：把第 0 组第 1 条拖到第 2 组第 1 条之前
+  const fromTitle = afterInner[0].titles[0]
+  const r2b = await evaluate(`window.__dnd.rowRect(2, 1)`)
+  await evaluate(`window.__dnd.startItem(0, 0)`)
+  await evaluate(`window.__dnd.over(${r2b.mid})`)
+  await sleep(140)
+  const crossLine = await evaluate(`({ item: window.__dnd.itemLines(), group: window.__dnd.lines(), targets: window.__dnd.targets() })`)
+  check('跨组时也只出条目级插入线', crossLine.item === 1 && crossLine.group === 0 && crossLine.targets === 0, JSON.stringify(crossLine))
+  await evaluate(`window.__dnd.drop(${r2b.mid})`)
+  await evaluate(`window.__dnd.tick()`)
+  await sleep(250)
+  await evaluate(`window.__dnd.endItem(0, 0)`)
+  const afterCross = await evaluate(`window.__dnd.itemRows()`)
+  check('跨组：源组少一条', afterCross[0].titles.length === afterInner[0].titles.length - 1, afterCross[0].titles.join(' | '))
+  check('跨组：插到目标位置（第 2 条前）', afterCross[2].titles[1] === fromTitle, afterCross[2].titles.join(' | '))
+
+  // 3.3 标题栏 = 收进此组（与「拖组合并」共用卡片手势，但文案/落点不同）
+  const rHead = await evaluate(`window.__dnd.headRect(2)`)
+  await evaluate(`window.__dnd.startItem(0, 0)`)
+  await evaluate(`window.__dnd.over(${rHead.mid})`)
+  await sleep(140)
+  const headMarks = await evaluate(`({ item: window.__dnd.itemLines(), group: window.__dnd.lines(), targets: window.__dnd.targets() })`)
+  check('落在标题栏 → 不画条目线，亮合并态', headMarks.item === 0 && headMarks.group === 0 && headMarks.targets === 1, JSON.stringify(headMarks))
+  const beforeAppend = await evaluate(`window.__dnd.itemRows()`)
+  await evaluate(`window.__dnd.drop(${rHead.mid})`)
+  await evaluate(`window.__dnd.tick()`)
+  await sleep(250)
+  await evaluate(`window.__dnd.endItem(0, 0)`)
+  const appended = await evaluate(`window.__dnd.itemRows()`)
+  check(
+    '收进此组 → 追加到目标组末尾',
+    appended[2].titles[appended[2].titles.length - 1] === beforeAppend[0].titles[0] && appended[2].titles.length === beforeAppend[2].titles.length + 1,
+    appended[2].titles.join(' | ')
+  )
+
+  // 3.4 锁定组不收：不亮合并态、不画线、松手无变化
+  const lockedIdx = 1
+  const rLockHead = await evaluate(`window.__dnd.headRect(${lockedIdx})`)
+  await evaluate(`window.__dnd.startItem(0, 0)`)
+  await evaluate(`window.__dnd.over(${rLockHead.mid})`)
+  await sleep(140)
+  const lockMarks = await evaluate(`({ item: window.__dnd.itemLines(), group: window.__dnd.lines(), targets: window.__dnd.targets() })`)
+  check('拖到锁定组 → 无插入线也无合并高亮', lockMarks.item === 0 && lockMarks.group === 0 && lockMarks.targets === 0, JSON.stringify(lockMarks))
+  const beforeLock = await evaluate(`window.__dnd.itemRows()`)
+  await evaluate(`window.__dnd.drop(${rLockHead.mid})`)
+  await evaluate(`window.__dnd.tick()`)
+  await sleep(250)
+  await evaluate(`window.__dnd.endItem(0, 0)`)
+  const afterLock = await evaluate(`window.__dnd.itemRows()`)
+  check('锁定组数据不变', JSON.stringify(afterLock) === JSON.stringify(beforeLock), '拖到锁定组却改动了数据')
+
+  // 3.5 拖标签不影响组顺序（这是「拖标签 ≠ 拖组」最容易串味的地方）
+  const groupTitlesEnd = await evaluate(`window.__dnd.titles()`)
+  check('拖标签后组顺序不变', groupTitlesEnd.join('|') === groupTitles0.join('|'), groupTitlesEnd.join(' | '))
 
   // 留一张截图便于人工复核
   const shot = await send('Page.captureScreenshot', { format: 'png' })

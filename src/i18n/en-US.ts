@@ -110,6 +110,7 @@ const enUS: Messages = {
   'group.updatedAt': 'Updated {time}',
   'group.mergeHint': 'Release to merge into the target group',
   'group.mergeTarget': 'Merge into this group',
+  'group.appendTarget': 'Add to this group',
   'group.lockedDrop': 'A locked group cannot receive dropped tabs.',
   'group.dropToNew': 'Release to create a new group',
   'group.moveUp': 'Move up',

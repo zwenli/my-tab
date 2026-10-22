@@ -45,6 +45,8 @@ const isLocked = computed<boolean>(() => {
   const g = data.groups.find((x) => x.id === props.groupId)
   return !!g?.locked
 })
+/** 正在被拖的那一条（虚化，让「拖的是哪条」一眼可见） */
+const isDragSource = computed<boolean>(() => ui.drag?.kind === 'tab' && ui.drag.id === props.item.id)
 
 const menuItems = computed<MenuItem[]>(() => {
   const task = props.item.task
@@ -133,6 +135,8 @@ async function onSelect(key: string): Promise<void> {
 
 function onDragStart(e: DragEvent): void {
   ui.drag = { kind: 'tab', id: props.item.id, groupId: props.groupId, index: props.index, source: props.source }
+  // 别再往卡片冒泡：卡片也监听 dragstart（拖组），被它接住就会把 payload 改成整组
+  e.stopPropagation()
   emit('dragstart', e)
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
   try {
@@ -187,8 +191,10 @@ const titleHtml = computed<string>(() => {
 <template>
   <li
     class="row"
-    :class="{ selected, selecting: selectable, done: taskState === 'done' }"
+    :class="{ selected, selecting: selectable, done: taskState === 'done', dragging: isDragSource }"
     :draggable="!isLocked && !selectable"
+    :data-item-id="item.id"
+    :data-item-index="index"
     @dragstart="onDragStart"
     @dragend="onDragEnd"
     @contextmenu.prevent="emit('contextmenu', $event)"
@@ -268,6 +274,9 @@ const titleHtml = computed<string>(() => {
 }
 .row.selected {
   background: var(--primary-soft);
+}
+.row.dragging {
+  opacity: 0.4;
 }
 .row.done .title {
   color: var(--text-muted);

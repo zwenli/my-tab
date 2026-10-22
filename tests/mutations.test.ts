@@ -55,6 +55,83 @@ describe('收集与变更', () => {
     expect(s.groups.find((g) => g.id === b.id)!.items.length).toBe(2)
   })
 
+  /** 造一组条目，标题即顺序标记 */
+  const itemsOf = (s: ReturnType<typeof fresh>, gid: string) =>
+    M.findGroup(s, gid)!.items.map((i) => i.title)
+
+  const three = (s: ReturnType<typeof fresh>) =>
+    M.collectTabs(s, [tab('https://1.com', 'A'), tab('https://2.com', 'B'), tab('https://3.com', 'C')], {}).group!
+
+  it('同组内拖拽排序：插到指定条目之前', () => {
+    const s = fresh()
+    const g = three(s)
+    const [a, , c] = g.items
+    M.moveItemsToGroup(s, [c!.id], g.id, 0)
+    expect(itemsOf(s, g.id)).toEqual(['C', 'A', 'B'])
+    // 再把它拖到 B 前面（下标 2 = C 之后）
+    M.moveItemsToGroup(s, [c!.id], g.id, 2)
+    expect(itemsOf(s, g.id)).toEqual(['A', 'C', 'B'])
+    expect(a!.id).toBe(M.findGroup(s, g.id)!.items[0]!.id)
+  })
+
+  it('同组内向下拖：锚点按移动前的下标算，不会跑回末尾', () => {
+    const s = fresh()
+    const g = three(s)
+    const [a, b, c] = g.items
+    // 把 A 拖到「C 之后」（插入线画在第 3 条上方 = 移到末尾之前）
+    M.moveItemsToGroup(s, [a!.id], g.id, 3)
+    expect(itemsOf(s, g.id)).toEqual(['B', 'C', 'A'])
+    // 再把 A 拖回最前
+    M.moveItemsToGroup(s, [a!.id], g.id, 0)
+    expect(itemsOf(s, g.id)).toEqual(['A', 'B', 'C'])
+    expect(b!.id).toBe(M.findGroup(s, g.id)!.items[1]!.id)
+    expect(c!.id).toBe(M.findGroup(s, g.id)!.items[2]!.id)
+  })
+
+  it('跨组插入到指定位置', () => {
+    const s = fresh()
+    const a = M.collectTabs(s, [tab('https://1.com', 'A1'), tab('https://2.com', 'A2')], {}).group!
+    const b = M.collectTabs(s, [tab('https://3.com', 'B1'), tab('https://4.com', 'B2')], {}).group!
+    M.moveItemsToGroup(s, [a.items[1]!.id], b.id, 1)
+    expect(itemsOf(s, b.id)).toEqual(['B1', 'A2', 'B2'])
+    expect(itemsOf(s, a.id)).toEqual(['A1'])
+  })
+
+  it('锚点本身也在移动（多选）时落点顺延，不被摘走后掉到末尾', () => {
+    const s = fresh()
+    const g = three(s)
+    const [a, b] = g.items
+    // 同时移动 A、B，插入线画在第 0 条之前：锚点跳过 A、B 落到 C → 原地不动
+    M.moveItemsToGroup(s, [a!.id, b!.id], g.id, 0)
+    expect(itemsOf(s, g.id)).toEqual(['A', 'B', 'C'])
+    // 画在末尾 → 整体后移，而不是被拆散
+    M.moveItemsToGroup(s, [a!.id, b!.id], g.id, 3)
+    expect(itemsOf(s, g.id)).toEqual(['C', 'A', 'B'])
+  })
+
+  it('拖回原位不算改动（不刷新 updatedAt，避免无意义写盘）', () => {
+    const s = fresh()
+    const g = three(s)
+    const ts = 946684800000
+    s.meta.updatedAt = ts
+    M.moveItemsToGroup(s, [g.items[1]!.id], g.id, 1)
+    M.moveItemsToGroup(s, [g.items[1]!.id], g.id, 2)
+    expect(s.meta.updatedAt, '顺序没变就不该 touch').toBe(ts)
+    expect(itemsOf(s, g.id)).toEqual(['A', 'B', 'C'])
+  })
+
+  it('锁定组不收外来条目，也不许自己的条目被拖走', () => {
+    const s = fresh()
+    const a = M.collectTabs(s, [tab('https://1.com', 'A1')], {}).group!
+    const b = M.collectTabs(s, [tab('https://2.com', 'B1'), tab('https://3.com', 'B2')], {}).group!
+    M.toggleGroupLock(s, b.id)
+    M.moveItemsToGroup(s, [a.items[0]!.id], b.id, 0)
+    expect(itemsOf(s, b.id), '锁定组不能被写入').toEqual(['B1', 'B2'])
+    expect(itemsOf(s, a.id), '来源没被清空').toEqual(['A1'])
+    M.moveItemsToGroup(s, [b.items[0]!.id], a.id, 0)
+    expect(itemsOf(s, b.id), '锁定组的条目不能被拖走').toEqual(['B1', 'B2'])
+  })
+
   it('locked 组不可删除、仍可改名', () => {
     const s = fresh()
     const g = M.collectTabs(s, [tab('https://a.com', 'A')], {}).group!
