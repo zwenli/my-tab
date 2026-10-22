@@ -8,12 +8,10 @@
  * 这是本扩展唯一会把数据对外输出的功能，且必须由用户主动触发。
  */
 import { SCHEMA_VERSION, SHARE_FORMAT } from './constants'
-import { now } from './utils'
+import { formatDateTime, now } from './utils'
 import type { ShareBundle, SharePayload, TabItem } from '../types'
 
 /* --------------------------- 编码 / 解码 --------------------------- */
-
-const pad2 = (n: number): string => String(n).padStart(2, '0')
 
 const hasCompression = (): boolean =>
   typeof CompressionStream === 'function' && typeof DecompressionStream === 'function'
@@ -152,9 +150,9 @@ export async function buildShareBundle(input: BuildPayloadInput): Promise<ShareB
 /** 生成完全自包含的分享页 HTML（离线可用，发给任何人都能打开） */
 export function renderStandaloneHtml(payload: SharePayload): string {
   const { title, note, items = [], createdAt } = payload
-  const d = new Date(createdAt || now())
-  const stampText = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
-  const heading = title || `${stampText} · ${items.length} 个标签`
+  // 与默认组名保持同一口径：时间戳到秒，不拼数量（数量页内另有统计）
+  const stampText = formatDateTime(createdAt || now(), true)
+  const heading = title || stampText
 
   const rows = items
     .map((it, i) => {

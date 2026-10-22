@@ -14,7 +14,7 @@
  * }
  */
 import { DEFAULT_SETTINGS, SCHEMA_VERSION } from './constants'
-import { now, uuid } from './utils'
+import { formatDateTime, now, uuid } from './utils'
 import type {
   DuplicatePolicy,
   Folder,
@@ -313,13 +313,12 @@ export function computeStats(state: MyTabState): Stats {
   }
 }
 
-/** 生成默认组名：例如「2026-10-13 10:30 · 12 个标签」 */
-export function defaultGroupTitle(count: number, ts = now(), locale = 'zh-CN'): string {
-  const d = new Date(ts)
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-  if (String(locale).startsWith('zh')) {
-    return `${stamp} · ${count} 个标签`
-  }
-  return `${stamp} · ${count} tab${count === 1 ? '' : 's'}`
+/**
+ * 生成默认组名：本地时间，精确到秒，例如「2026-10-13 10:30:07」。
+ *
+ * 刻意不带标签数量：数量会随组内条目的增删而不同步，组卡片/侧边栏本来就有条目数，
+ * 写在名字里只会越看越不对。精确到秒是为了让「同一分钟内连续收起两次」不重名。
+ */
+export function defaultGroupTitle(ts = now()): string {
+  return formatDateTime(ts, true)
 }

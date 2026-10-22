@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import { LIBRARY_FORMAT } from '../src/core/constants'
 import { filesToState, groupFileName, isConflictCopy, shortId, stateToFiles } from '../src/core/libraryFormat'
-import { badgeText, computeStats, countOpenTasks, createGroup, createTabItem, emptyState, normalizeState } from '../src/core/model'
+import { badgeText, computeStats, countOpenTasks, createGroup, createTabItem, defaultGroupTitle, emptyState, normalizeState } from '../src/core/model'
 import * as M from '../src/core/mutations'
 import { searchGroups, searchItems } from '../src/core/search'
 import { exportToHtml, exportToText, parseText } from '../src/core/exportImport'
@@ -68,6 +68,14 @@ const run = async (): Promise<void> => {
     assert.equal(s.settings.theme, 'dark')
     assert.equal(s.settings.duplicatePolicy, 'keep')
     assert.equal(s.settings.restoreTarget, 'current')
+  })
+
+  await test('默认组名是精确到秒的时间戳，且不带数量', () => {
+    const ts = new Date(2026, 9, 22, 14, 30, 7).getTime()
+    assert.equal(defaultGroupTitle(ts), '2026-10-22 14:30:07')
+    assert.ok(!defaultGroupTitle(ts).includes('标签'), '组名里不该再有数量口径')
+    // 同一分钟内连续收起两次也要区分开，否则组名会撞
+    assert.notEqual(defaultGroupTitle(ts), defaultGroupTitle(ts + 1000))
   })
 
   console.log('\n[2] 收集与变更')
@@ -419,9 +427,9 @@ const run = async (): Promise<void> => {
     assert.equal(searchGroups(s, 'vue').length, 0)
   })
 
-  await test('默认组名（日期 · 数量）也能搜到，修复「最近收起」跳转空白', () => {
+  await test('默认组名（时间戳到秒）也能搜到，修复「最近收起」跳转空白', () => {
     const s = emptyState('d')
-    const title = '2026-10-22 14:30 · 12 个标签'
+    const title = '2026-10-22 14:30:07'
     M.collectTabs(s, [tab('https://a.com', '随便一个标题')], { title })
     assert.equal(searchGroups(s, title).length, 1)
     assert.equal(searchGroups(s, '14:30').length, 1)

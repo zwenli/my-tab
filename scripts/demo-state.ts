@@ -77,11 +77,12 @@ export function buildDemoState({ theme = 'dark', language = 'zh-CN' }: DemoOptio
     })
   )
 
+  // 模拟一个「用默认组名」的组：时间戳精确到秒，不拼数量
   const d = new Date(Date.now() - 86400_000 * 2)
   const p = (n: number): string => String(n).padStart(2, '0')
   state.groups.push(
     createGroup({
-      title: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())} · 8 个标签`,
+      title: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`,
       createdAt: Date.now() - 86400_000 * 2,
       items: [
         t('https://news.ycombinator.com/', 'Hacker News'),

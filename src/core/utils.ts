@@ -173,12 +173,13 @@ export function humanTime(ts: number, locale = 'zh-CN'): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-/** 格式化完整时间 */
-export function formatDateTime(ts: number): string {
+/** 格式化完整时间；`withSeconds` 用于默认组名这类需要避免重名的场景 */
+export function formatDateTime(ts: number, withSeconds = false): string {
   if (!ts) return '—'
   const d = new Date(ts)
   const pad = (n: number): string => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return withSeconds ? `${stamp}:${pad(d.getSeconds())}` : stamp
 }
 
 /** 字节数人性化 */

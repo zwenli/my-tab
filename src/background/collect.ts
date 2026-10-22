@@ -16,7 +16,6 @@ import {
   toCollectable
 } from '@/core/tabs'
 import { now } from '@/core/utils'
-import { resolveLocale } from '@/i18n'
 import type { CollectOptions, CollectResult } from '@/types'
 
 let collecting = false
@@ -56,8 +55,7 @@ export async function collect({ mode = 'auto', windowId, tabId, openList = true,
     if (!targets.length) return { ok: false, reason: 'NOTHING_TO_COLLECT', count: 0 }
 
     const items = targets.map(toCollectable)
-    const locale = resolveLocale(settings.language)
-    const groupTitle = title || defaultGroupTitle(items.length, now(), locale)
+    const groupTitle = title || defaultGroupTitle(now())
 
     const res = await mutate((s) => collectTabs(s, items, { title: groupTitle }))
 
