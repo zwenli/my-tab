@@ -11,6 +11,12 @@ export const STORAGE_KEY = 'mytab:state'
 /** 本设备的稳定标识 */
 export const DEVICE_KEY = 'mytab:deviceId'
 
+/**
+ * 「有改动没写进资料库」的标记（跨页面共享）。
+ * 授权失效时写操作会静默失败，改动只停在缓存里；恢复授权后靠这个标记决定补写还是重读。
+ */
+export const PENDING_KEY = 'mytab:pendingWrite'
+
 /** 资料库格式标识（写在 library.json 里） */
 export const LIBRARY_FORMAT = 'my-tab'
 

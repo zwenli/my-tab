@@ -126,5 +126,15 @@ OneDrive 客户端负责把这个文件夹同步到其他设备
 
 - **只有 Chrome / Edge 支持**直接读写文件夹（File System Access API）。Firefox / Safari 上请用「导出 / 导入」。
 - **后台无法弹授权框**：请先在设置页完成一次目录授权。
+- **授权按会话，绑定不会丢**：Chrome 在「关掉这个来源的最后一批标签页」（重启浏览器就是这种情况）之后会把
+  `requestPermission` 的授权退回 `prompt`，但 **IndexedDB 里的目录句柄仍然有效**。
+  所以重启后不是「未连接」，而是「需要重新确认一次」：
+  - 状态用 `libraryAccessLevel()` 分成 `unsupported / unbound / needs-grant / denied / ok`，**不能再用 `permission === 'granted'` 当唯一口径**；
+  - 列表页 `/ 设置页 / 数据弹窗` 给一个「恢复访问」按钮，走 `restoreLibraryAccess()`：复用已有句柄 `requestPermission()`，
+    **不弹文件夹选择器**；授权框里选「每次访问都允许」之后就是永久的；
+  - 页面加载后的**第一次用户手势**会自动补一次授权（`useLibraryAutoRestore`），用户通常什么都不用做；
+  - 授权失效期间写操作会静默失败，改动只停在缓存里 —— 用 `mytab:pendingWrite` 标记（跨页面共享）记账：
+    恢复授权时**有欠写就补写，没欠写才按「文件即真相」重读**，避免把另一台设备的改动覆盖掉。
+  - 回归验收：`npm run check:library`（桩住 `indexedDB`，模拟 `permission=prompt` 的真实状态）。
 - **冲突副本不自动合并**：OneDrive 生成 `xxx (冲突副本).json` 时会提示你手动处理 —— 这是刻意的，静默合并更危险。
 - 每次扫描要把资料库整个读一遍。一个人的标签库（几百到几千组）成本很低；真到扫不动那天，再加一个可随时删除、可从文件重建的索引也不迟 —— 但它只会是**缓存**。

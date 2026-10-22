@@ -52,6 +52,14 @@ async function doRescan(): Promise<void> {
   await loadStatus()
 }
 
+/** 浏览器重启后授权会重置：复用已有句柄确认一次即可，不用重新选文件夹 */
+async function doRestore(): Promise<void> {
+  busy.value = true
+  await actions.restoreLibraryAccess()
+  busy.value = false
+  await loadStatus()
+}
+
 async function doImportPaste(): Promise<void> {
   if (!pasteText.value.trim()) return
   await actions.importText(pasteText.value)
@@ -125,10 +133,14 @@ async function doImportPaste(): Promise<void> {
         <div class="line">
           <Icon :name="status?.connected ? 'check-circle' : 'alert-circle'" :size="16" :class="status?.connected ? 'ok' : 'warn'" />
           <span class="grow">{{ t('settings.libraryDir') }}：{{ status?.dirName || t('settings.libraryUnset') }}</span>
+          <button v-if="status?.level === 'needs-grant'" class="btn btn-primary btn-sm" type="button" :disabled="busy" @click="doRestore">
+            {{ t('library.restore') }}
+          </button>
           <button class="btn btn-sm" type="button" :disabled="busy" @click="pickDir">
             {{ t('settings.libraryPick') }}
           </button>
         </div>
+        <p v-if="status?.level === 'needs-grant'" class="hint">{{ t('library.needsGrantHint') }}</p>
       </div>
 
       <div class="btns">

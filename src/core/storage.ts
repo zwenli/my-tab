@@ -11,7 +11,7 @@
  * 因此每次写操作都会：改内存 → 写缓存 → **差异同步到资料库**。
  * 若尚未绑定资料库，则只写缓存（本地暂存模式），界面会提示去连接资料库。
  */
-import { DEVICE_KEY, LIBRARY_FORMAT, STORAGE_KEY } from './constants'
+import { DEVICE_KEY, LIBRARY_FORMAT, PENDING_KEY, STORAGE_KEY } from './constants'
 import { getLibraryDir, readLibrary, syncLibrary, writeLibraryFiles } from './library'
 import { LIB_FILE, filesToState, stateToFiles } from './libraryFormat'
 import { emptyState, normalizeState } from './model'
@@ -106,11 +106,47 @@ let lastSync: LibrarySyncResult = { ok: true, written: 0, trashed: 0 }
 let lastConflicts: string[] = []
 /** 上一次成功同步出去的状态，用于「不带 prev」时也能算出最小差异 */
 let lastSynced: MyTabState | null = null
+/**
+ * 是否存在「本该落盘但没写成功」的改动。
+ *
+ * 只有授权失效 / 写失败会置 true（NO_DIR 属于本地暂存模式，不算）。
+ * 恢复授权后靠它判断：本机有未落盘的改动就补写，否则按「文件即真相」把磁盘内容读回来。
+ * 标记本身写进 chrome.storage（跨页面共享）—— 列表页、弹窗、后台各有独立内存，
+ * 弹窗里收集的标签也算「欠写」，不能只在列表页的内存里记账。
+ */
+let pendingWrite = false
+
+/** 本上下文内存里的状态（同步读，仅供提示用） */
+export const hasPendingWrite = (): boolean => pendingWrite
+
+/** 跨上下文确认是否欠写（读一次存储，恢复授权前用这个） */
+export async function hasPendingWriteAsync(): Promise<boolean> {
+  try {
+    const res = await rawGet(PENDING_KEY)
+    return res[PENDING_KEY] === true
+  } catch {
+    return pendingWrite
+  }
+}
+
+async function setPending(v: boolean): Promise<void> {
+  if (pendingWrite === v) return
+  pendingWrite = v
+  try {
+    if (v) await rawSet({ [PENDING_KEY]: true })
+    else await rawRemove(PENDING_KEY)
+  } catch {
+    /* 标记写不进去不影响主流程 */
+  }
+}
 
 /** 最近一次同步结果（供界面提示失败原因） */
 export const getLastSync = (): LibrarySyncResult => ({ ...lastSync })
 /** 最近一次扫描发现的云盘冲突副本 */
 export const getLastConflicts = (): string[] => [...lastConflicts]
+
+/** 判断一次同步结果是否属于「本该写、但没写成」 */
+const missWrite = (r: LibrarySyncResult): boolean => !r.ok && r.reason !== 'NO_DIR'
 
 /**
  * 把状态差异同步到资料库。
@@ -125,6 +161,7 @@ export async function syncToLibrary(next: MyTabState, prev?: MyTabState | null, 
   }
   const base = prev ?? lastSynced
   lastSync = await syncLibrary(next, { prev: base, createdAt: next.meta.createdAt, request })
+  await setPending(missWrite(lastSync))
   if (lastSync.ok) lastSynced = deepClone(next)
   return lastSync
 }
@@ -133,6 +170,7 @@ export async function syncToLibrary(next: MyTabState, prev?: MyTabState | null, 
 export async function publishToLibrary(state: MyTabState, request = true): Promise<LibrarySyncResult> {
   const files = stateToFiles(state, { format: LIBRARY_FORMAT, createdAt: state.meta.createdAt })
   lastSync = await writeLibraryFiles(files, request)
+  await setPending(missWrite(lastSync))
   if (lastSync.ok) lastSynced = deepClone(state)
   return lastSync
 }
@@ -173,6 +211,8 @@ export async function loadFromLibrary({ request = false }: { request?: boolean }
 /** 用资料库内容替换本地缓存（不改动磁盘），并把它记为「已同步」基线 */
 export async function adoptLibraryState(state: MyTabState): Promise<MyTabState> {
   lastSynced = deepClone(state)
+  // 已经以磁盘为准，缓存里就不再有「欠写」的差异
+  await setPending(false)
   return saveState(state)
 }
 

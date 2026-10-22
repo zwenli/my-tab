@@ -11,6 +11,7 @@ import GroupCard from '@/components/GroupCard.vue'
 import SearchResults from '@/components/SearchResults.vue'
 import SelectionBar from '@/components/SelectionBar.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import LibraryBar from '@/components/LibraryBar.vue'
 import DialogHost from '@/components/dialogs/DialogHost.vue'
 import Toasts from '@/components/Toasts.vue'
 import Icon from '@/components/Icon.vue'
@@ -18,6 +19,7 @@ import { useDataStore } from '@/stores/data'
 import { useUiStore, SCOPE } from '@/stores/ui'
 import { useI18n } from '@/composables/useI18n'
 import { useActions } from '@/composables/useActions'
+import { useLibraryAutoRestore } from '@/composables/useLibraryAccess'
 import { useTheme } from '@/composables/useTheme'
 import { applyVisibleOrder, clampPinnedIndex, hitTest, moveToInsertPoint, sameOrder } from '@/core/dragOrder'
 import type { Group, TabItem } from '@/types'
@@ -28,6 +30,9 @@ const { t } = useI18n()
 const actions = useActions()
 
 useTheme()
+// 浏览器重启后资料库授权会被重置成 prompt：在本次页面的第一次用户手势里自动补一次，
+// 用户通常什么都不用做（授权框里选「每次访问都允许」之后就不会再问）
+useLibraryAutoRestore()
 
 const canvas = ref<HTMLElement | null>(null)
 const dropIndex = ref<number>(-1)
@@ -333,6 +338,8 @@ function collect(): void {
 
       <main class="content" role="main">
         <div class="content-inner">
+          <LibraryBar />
+
           <QuickListPanel v-if="!showSearch && !showQuickFull" variant="strip" :show-favicons="showFavicons" />
 
           <SearchResults v-if="showSearch" />

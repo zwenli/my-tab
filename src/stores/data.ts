@@ -6,12 +6,13 @@
  */
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { getLibraryStatus } from '@/core/library'
+import { getLibraryStatus, isFsAccessSupported, restoreLibraryAccess as restoreDirAccess } from '@/core/library'
 import { computeStats, emptyState } from '@/core/model'
 import * as M from '@/core/mutations'
 import {
   adoptLibraryState,
   getLastSync,
+  hasPendingWriteAsync,
   loadFromLibrary,
   loadState,
   mutate,
@@ -21,7 +22,8 @@ import {
   resetData,
   saveState,
   storageUsage,
-  subscribe
+  subscribe,
+  syncToLibrary
 } from '@/core/storage'
 import type {
   CollectableTab,
@@ -54,9 +56,19 @@ export const useDataStore = defineStore('data', () => {
   const usage = ref(0)
   const error = ref('')
   /** 资料库连接状态 */
-  const library = ref<LibraryStatus>({ supported: false, hasDir: false, dirName: '', permission: 'none', connected: false })
+  /** 资料库连接状态（能力探测同步给出，避免首帧显示「不支持」） */
+  const library = ref<LibraryStatus>({
+    supported: isFsAccessSupported(),
+    hasDir: false,
+    dirName: '',
+    permission: 'none',
+    connected: false,
+    level: isFsAccessSupported() ? 'unbound' : 'unsupported'
+  })
   /** 最近一次写入资料库的结果 */
   const lastSync = ref<LibrarySyncResult>({ ok: true, written: 0, trashed: 0 })
+  /** 正在恢复资料库授权 */
+  const restoring = ref(false)
   let unsubscribe: (() => void) | null = null
 
   /* ---------------------------- 初始化 ---------------------------- */
@@ -91,6 +103,35 @@ export const useDataStore = defineStore('data', () => {
   async function refreshLibrary(): Promise<LibraryStatus> {
     library.value = await getLibraryStatus()
     return library.value
+  }
+
+  /**
+   * 恢复资料库访问（浏览器重启后授权会被重置成 prompt，但目录句柄还在）。
+   *
+   * 必须在用户手势里调用。成功后按情况收尾：
+   * - 授权失效期间有改动停在缓存里 → 补写进文件夹（否则这些改动只在本机）；
+   * - 没有欠写 → 按「文件即真相」把磁盘上的最新内容读回来。
+   */
+  async function restoreAccess(): Promise<{ ok: boolean; reason?: string }> {
+    if (restoring.value) return { ok: false, reason: 'BUSY' }
+    restoring.value = true
+    try {
+      const granted = await restoreDirAccess()
+      const st = await refreshLibrary()
+      if (!granted || !st.connected) return { ok: false, reason: 'NO_PERMISSION' }
+
+      if (await hasPendingWriteAsync()) {
+        const res = await syncToLibrary(state.value)
+        lastSync.value = getLastSync()
+        if (!res.ok) return { ok: false, reason: res.reason }
+      } else {
+        const res = await loadFromLibrary({ request: false })
+        if (res.ok && !res.isNew && res.state) state.value = await adoptLibraryState(res.state)
+      }
+      return { ok: true }
+    } finally {
+      restoring.value = false
+    }
   }
 
   /**
@@ -255,6 +296,7 @@ export const useDataStore = defineStore('data', () => {
     error,
     library,
     lastSync,
+    restoring,
     groups,
     folders,
     quickList,
@@ -265,6 +307,7 @@ export const useDataStore = defineStore('data', () => {
     itemIndex,
     displayGroups,
     refreshLibrary,
+    restoreAccess,
     rescanFromLibrary,
     silentRescan,
     ...api

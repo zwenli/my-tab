@@ -265,6 +265,9 @@ export type LibraryReason =
   | 'UNKNOWN_MESSAGE'
   | 'COLLECT_FAILED'
 
+/** 资料库访问等级（见 core/libraryAccess.ts 的判定逻辑） */
+export type LibraryAccessLevel = 'unsupported' | 'unbound' | 'needs-grant' | 'denied' | 'ok'
+
 /** 资料库连接状态 */
 export interface LibraryStatus {
   supported: boolean
@@ -272,6 +275,11 @@ export interface LibraryStatus {
   dirName: string
   permission: PermissionState | 'none' | 'error'
   connected: boolean
+  /**
+   * 访问等级：`needs-grant` = 绑定还在、只差一次重新确认授权（浏览器重启后的常态），
+   * 与「从没绑定过」(`unbound`) 必须区分显示。
+   */
+  level: LibraryAccessLevel
 }
 
 /** 一次差异同步的结果 */

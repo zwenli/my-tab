@@ -12,6 +12,7 @@
  */
 import { IDB_DIR_KEY, LIBRARY_FORMAT } from './constants'
 import { idbDelete, idbGet, idbSet } from './idb'
+import { libraryAccessLevel, isRestorable, type LibraryAccessLevel } from './libraryAccess'
 import { FOLDERS_FILE, GROUPS_DIR, LIB_FILE, QUICK_FILE, TRASH_DIR, stateToFiles, isConflictCopy, groupFileName, type LibraryFiles } from './libraryFormat'
 import { now } from './utils'
 import type { MyTabState } from '../types'
@@ -82,6 +83,23 @@ export async function verifyPermission(
   return (await h.requestPermission(opts)) === 'granted'
 }
 
+/**
+ * 恢复资料库访问：复用 IndexedDB 里已有的目录句柄重新申请授权。
+ *
+ * 必须在用户手势里调用（点击）。它**不会**弹文件夹选择器：
+ * 浏览器只是问一句「是否允许继续访问这个文件夹」，所以用户不用重新找一遍目录。
+ * 若权限已被彻底拒绝（denied）或句柄失效，返回 false，此时才需要重新选择文件夹。
+ */
+export async function restoreLibraryAccess(): Promise<boolean> {
+  const dir = await getLibraryDir()
+  if (!dir) return false
+  try {
+    return await verifyPermission(dir, 'readwrite', true)
+  } catch {
+    return false
+  }
+}
+
 export interface LibraryStatus {
   supported: boolean
   /** 已绑定目录且权限有效 */
@@ -89,6 +107,11 @@ export interface LibraryStatus {
   hasDir: boolean
   dirName: string
   permission: PermissionState | 'none' | 'error'
+  /**
+   * 访问等级（见 core/libraryAccess.ts）。
+   * `needs-grant` 表示「绑定还在，只差一次重新确认」，不能当成「未连接」。
+   */
+  level: LibraryAccessLevel
 }
 
 export async function getLibraryStatus(): Promise<LibraryStatus> {
@@ -110,7 +133,8 @@ export async function getLibraryStatus(): Promise<LibraryStatus> {
     hasDir: !!dir,
     dirName: dir?.name ?? '',
     permission,
-    connected: supported && !!dir && permission === 'granted'
+    connected: supported && !!dir && permission === 'granted',
+    level: libraryAccessLevel({ supported, hasDir: !!dir, permission })
   }
 }
 
@@ -311,4 +335,5 @@ export async function syncLibrary(
   }
 }
 
-export { groupFileName, LIBRARY_FORMAT }
+export { groupFileName, LIBRARY_FORMAT, libraryAccessLevel, isRestorable }
+export type { LibraryAccessLevel }

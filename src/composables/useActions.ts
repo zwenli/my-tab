@@ -74,6 +74,7 @@ export interface UseActionsApi {
   libraryStatus: () => Promise<LibraryStatus>
   chooseLibraryDir: () => Promise<{ ok: boolean; name?: string; reason?: string }>
   forgetLibrary: () => Promise<void>
+  restoreLibraryAccess: (opts?: { silent?: boolean }) => Promise<ActionResult>
   writeLibrary: (opts?: { silent?: boolean }) => Promise<SyncSummary>
   rescanLibrary: () => Promise<ScanSummary>
   /* 其他 */
@@ -287,6 +288,22 @@ export function useActions(): UseActionsApi {
     ui.toast(t('toast.libraryForgotten'), 'success')
   }
 
+  /**
+   * 恢复资料库访问：复用已保存的目录句柄重新授权，不需要重新选择文件夹。
+   * 必须在用户手势（点击）里调用。
+   */
+  async function restoreLibraryAccess({ silent = false }: { silent?: boolean } = {}): Promise<ActionResult> {
+    const res = await data.restoreAccess()
+    if (res.ok) {
+      if (!silent) ui.toast(t('toast.libraryAccessRestored'), 'success')
+      return { ok: true }
+    }
+    if (!silent && res.reason !== 'BUSY') {
+      ui.toast(t('toast.libraryAccessPending'), 'warning')
+    }
+    return { ok: false, reason: res.reason }
+  }
+
   /** 立即把当前内容全量写入资料库（用户手势上下文，可弹授权） */
   async function writeLibrary({ silent = false }: { silent?: boolean } = {}): Promise<SyncSummary> {
     const res = await publishToLibrary(data.state, true)
@@ -344,6 +361,7 @@ export function useActions(): UseActionsApi {
     libraryStatus,
     chooseLibraryDir,
     forgetLibrary,
+    restoreLibraryAccess,
     writeLibrary,
     rescanLibrary,
     clearList,

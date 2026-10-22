@@ -10,6 +10,7 @@ import DialogHost from '@/components/dialogs/DialogHost.vue'
 import { useDataStore } from '@/stores/data'
 import { useI18n } from '@/composables/useI18n'
 import { useActions } from '@/composables/useActions'
+import { useLibraryAutoRestore } from '@/composables/useLibraryAccess'
 import { useTheme } from '@/composables/useTheme'
 import { queryTabs } from '@/core/tabs'
 import { humanTime } from '@/core/utils'
@@ -20,6 +21,8 @@ const { t, dateLocale } = useI18n()
 const actions = useActions()
 
 useTheme()
+// 重启后授权会重置：在第一次点击里自动补一次，收集动作才能立刻写盘
+useLibraryAutoRestore()
 
 const collecting = ref<string>('')
 const tabCount = ref<number>(0)

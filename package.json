@@ -12,6 +12,7 @@
     "icons": "tsx scripts/make-icons.ts",
     "selftest": "tsx scripts/selftest.ts",
     "check:dnd": "node scripts/check-dnd.mjs",
+    "check:library": "node scripts/check-library.mjs",
     "demo": "tsx scripts/make-demo-page.ts && tsx scripts/make-ui-harness.ts",
     "preview": "vite preview --port 4173 --strictPort",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""

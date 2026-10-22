@@ -11,10 +11,10 @@ import { useDataStore } from '@/stores/data'
 import { useUiStore } from '@/stores/ui'
 import { useI18n } from '@/composables/useI18n'
 import { useActions } from '@/composables/useActions'
+import { useLibraryAutoRestore } from '@/composables/useLibraryAccess'
 import { useTheme } from '@/composables/useTheme'
 import { SETTING_GROUPS } from '@/core/constants'
-import type { SelectOption, SettingKey } from '@/types'
-import { isFsAccessSupported } from '@/core/library'
+import type { LibraryStatus, SelectOption, SettingKey } from '@/types'
 import { humanBytes, humanTime } from '@/core/utils'
 
 /* ---------------------------- 局部类型 ---------------------------- */
@@ -51,6 +51,8 @@ const { t, dateLocale } = useI18n()
 const actions = useActions()
 
 useTheme()
+// 重启后授权会重置成 prompt：在本次页面的第一次点击里自动补一次
+useLibraryAutoRestore()
 
 /** 分区键，顺序即左侧导航顺序 */
 const SECTION_KEYS = ['appearance', 'collect', 'restore', 'library', 'data', 'shortcuts', 'about']
@@ -62,14 +64,14 @@ const initialSection = (() => {
 })()
 
 const active = ref<string>(initialSection)
-// 能力探测是同步的，先给出正确结论，避免首帧闪出「不支持」
-const library = ref({
-  supported: isFsAccessSupported(),
-  hasDir: false,
-  dirName: '',
-  permission: 'none' as PermissionState | 'none' | 'error',
-  connected: false
-})
+/**
+ * 资料库状态直接取 store（唯一真相源）：
+ * 这样「恢复访问」在别处完成后，这里的卡片会同步更新，不会停在旧的「未授权」。
+ * 能力探测在 store 初始化时已同步做过，首帧不会闪出「不支持」。
+ */
+const library = computed<LibraryStatus>(() => data.library)
+/** 绑定还在，只差浏览器重启后的一次重新确认 */
+const needsGrant = computed<boolean>(() => library.value.level === 'needs-grant')
 const busy = ref<boolean>(false)
 const pasteText = ref<string>('')
 const commands = ref<CommandInfo[]>([])
@@ -147,7 +149,7 @@ function selectSection(key: string): void {
 }
 
 async function loadLibraryStatus(): Promise<void> {
-  library.value = await actions.libraryStatus()
+  await data.refreshLibrary()
 }
 
 async function pickDir(): Promise<void> {
@@ -159,6 +161,14 @@ async function pickDir(): Promise<void> {
 
 async function forgetDir(): Promise<void> {
   await actions.forgetLibrary()
+  await loadLibraryStatus()
+}
+
+/** 恢复访问：复用已保存的句柄重新授权，不需要重新选择文件夹 */
+async function restoreAccess(): Promise<void> {
+  busy.value = true
+  await actions.restoreLibraryAccess()
+  busy.value = false
   await loadLibraryStatus()
 }
 
@@ -374,13 +384,16 @@ onMounted(async () => {
                 <div class="b-sub">
                   {{ library.supported ? t('settings.librarySupported') : t('settings.libraryUnsupported') }}
                   <template v-if="library.hasDir">
-                    · {{ t('settings.libraryPermission', { state: library.permission === 'granted' ? t('settings.libraryGranted') : t('settings.libraryDenied') }) }}
+                    · {{ t('settings.libraryPermission', { state: library.permission === 'granted' ? t('settings.libraryGranted') : needsGrant ? t('settings.libraryConfirmNeeded') : t('settings.libraryDenied') }) }}
                   </template>
                 </div>
               </div>
               <div class="b-acts">
                 <button class="btn btn-primary btn-sm" type="button" :disabled="!library.supported || busy" @click="pickDir">
                   {{ t('settings.libraryPick') }}
+                </button>
+                <button v-if="needsGrant" class="btn btn-sm" type="button" :disabled="busy" @click="restoreAccess">
+                  <Icon name="refresh-cw" :size="13" />{{ t('library.restore') }}
                 </button>
                 <button v-if="library.hasDir" class="btn btn-sm" type="button" @click="forgetDir">
                   {{ t('settings.libraryForget') }}
@@ -389,7 +402,10 @@ onMounted(async () => {
             </div>
             <p class="b-hint">{{ t('settings.libraryPickHint') }}</p>
 
-            <p v-if="!library.connected" class="b-hint warn-line">{{ t('settings.libraryStaging') }}</p>
+            <p v-if="needsGrant" class="b-hint warn-line">
+              {{ t('settings.libraryNeedsGrant', { name: library.dirName }) }}
+            </p>
+            <p v-else-if="!library.hasDir" class="b-hint warn-line">{{ t('settings.libraryStaging') }}</p>
 
             <div class="b-acts wide">
               <button class="btn btn-primary" type="button" :disabled="busy || !library.connected" @click="doWrite">

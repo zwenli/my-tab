@@ -13,6 +13,7 @@ import { searchItems } from '../src/core/search'
 import { exportToHtml, exportToText, parseText } from '../src/core/exportImport'
 import { buildPayload, linksText, packPayload, renderShareText, renderStandaloneHtml, unpackPayload } from '../src/core/share'
 import { applyVisibleOrder, clampPinnedIndex, hitTest, moveToInsertPoint, sameOrder } from '../src/core/dragOrder'
+import { isRestorable, libraryAccessLevel } from '../src/core/libraryAccess'
 import { resolveTipDir, resolveTipPos } from '../src/directives/tipGeometry'
 import type { CollectableTab, MyTabState, TaskFlag } from '../src/types'
 
@@ -571,6 +572,29 @@ const run = async (): Promise<void> => {
     assert.deepEqual(tabHit(105), { index: -1, mergeIndex: 0 }, '间隙吸附到上一张，不会闪成「新建组」')
     assert.deepEqual(tabHit(300), { index: -1, mergeIndex: 2 })
     assert.deepEqual(tabHit(400), { index: -1, mergeIndex: -1 }, '离所有卡片都远 → 空白处，新建组')
+  })
+
+  console.log('\n[9] 资料库访问等级（重启后不该显示「未连接」）')
+
+  await test('权限被浏览器重置为 prompt → needs-grant，绑定仍然算在', () => {
+    const level = libraryAccessLevel({ supported: true, hasDir: true, permission: 'prompt' })
+    assert.equal(level, 'needs-grant')
+    assert.equal(isRestorable(level), true, '这种情况只需「恢复访问」，不必重新选文件夹')
+  })
+
+  await test('没绑过 / 已授权 / 被拒绝 / 不支持 各自分明', () => {
+    assert.equal(libraryAccessLevel({ supported: true, hasDir: false, permission: 'none' }), 'unbound')
+    assert.equal(libraryAccessLevel({ supported: true, hasDir: true, permission: 'granted' }), 'ok')
+    assert.equal(libraryAccessLevel({ supported: true, hasDir: true, permission: 'denied' }), 'denied')
+    assert.equal(libraryAccessLevel({ supported: true, hasDir: true, permission: 'error' }), 'denied', '句柄失效要重新选')
+    assert.equal(libraryAccessLevel({ supported: false, hasDir: true, permission: 'granted' }), 'unsupported')
+  })
+
+  await test('只有 needs-grant 走轻量恢复，其余都不该走', () => {
+    assert.deepEqual(
+      (['unsupported', 'unbound', 'needs-grant', 'denied', 'ok'] as const).filter((l) => isRestorable(l)),
+      ['needs-grant']
+    )
   })
 
   console.log(`\n结果：${passed} 通过 / ${failed} 失败\n`)
