@@ -3,7 +3,7 @@
  * 主列表页。
  * 组合：顶栏 + 侧栏 + 内容区（快捷列表 / 搜索结果 / 标签组画布）+ 多选条 + 弹窗 + 提示。
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
 import SideBar from '@/components/SideBar.vue'
 import QuickListPanel from '@/components/QuickListPanel.vue'
@@ -37,6 +37,49 @@ useLibraryAutoRestore()
 const canvas = ref<HTMLElement | null>(null)
 const dropIndex = ref<number>(-1)
 const canvasHint = ref<boolean>(false)
+
+/* ------------------------- 定位高亮 -------------------------
+ *
+ * 来自弹窗「最近收起」或搜索结果里的分组点击：滚到该组并闪一下描边。
+ * 只做视觉提示，不改数据；2.4s 后自动褪掉，避免长期占着视觉焦点。
+ */
+
+const focusedId = ref<string>('')
+let focusTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearFocusHighlight(): void {
+  if (focusTimer) clearTimeout(focusTimer)
+  focusTimer = null
+  focusedId.value = ''
+}
+
+/** 找到组元素（元素的顺序 = visibleGroups 顺序，用 dataset 比对最稳） */
+function groupElement(id: string): HTMLElement | null {
+  const nodes = canvas.value?.querySelectorAll<HTMLElement>('[data-group-id]') ?? []
+  for (const node of nodes) if (node.dataset.groupId === id) return node
+  return null
+}
+
+watch(
+  () => ui.focusTarget,
+  async (target) => {
+    if (!target) return
+    await nextTick()
+    const group = data.groups.find((g) => g.id === target.id)
+    if (!group) return
+    // 收起状态下滚过去只看到一行标题，展开才叫「打开这个组」
+    if (group.collapsed) data.toggleGroupCollapsed(group.id)
+    await nextTick()
+
+    groupElement(target.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (focusTimer) clearTimeout(focusTimer)
+    focusedId.value = target.id
+    focusTimer = setTimeout(() => {
+      focusedId.value = ''
+      focusTimer = null
+    }, 2400)
+  }
+)
 
 /* ------------------------- 可见分组 ------------------------- */
 
@@ -298,23 +341,42 @@ function onKeydown(e: KeyboardEvent): void {
 
 /* ------------------------- 初始化 ------------------------- */
 
+/**
+ * 解析地址栏 hash，支持两种入口：
+ *   #q=<关键词>    地址栏搜索 / 外部跳转
+ *   #g=<groupId>   弹窗「最近收起」直接定位到某个组
+ *
+ * 必须同时处理首屏和 hashchange：列表页已经打开时再切到 list.html#g=xxx
+ * 属于「同文档导航」，onMounted 不会再跑一次（历史 bug：点最近收起没反应）。
+ */
+function applyLocationHash(): void {
+  const hash = location.hash || ''
+  const q = hash.match(/[#&]q=([^&]+)/)
+  const g = hash.match(/[#&]g=([^&]+)/)
+  if (!q && !g) return
+
+  const groupId = g ? decodeURIComponent(g[1]) : ''
+  if (q) ui.setSearch(decodeURIComponent(q[1]))
+  if (groupId && data.groups.some((x) => x.id === groupId)) ui.focusGroup(groupId)
+
+  // 处理完就把 hash 抹掉，刷新页面不会重复定位
+  history.replaceState(null, '', location.pathname)
+}
+
 onMounted(async () => {
   await data.init()
   // 文件即真相：回到列表页时静默重扫资料库，把 Finder / 云盘里的改动读进来
   void data.silentRescan()
   document.addEventListener('keydown', onKeydown)
+  window.addEventListener('hashchange', applyLocationHash)
 
-  // 支持 list.html#q=关键词（来自地址栏搜索或外部跳转）
-  const hash = location.hash || ''
-  const m = hash.match(/[#&]q=([^&]+)/)
-  if (m) {
-    ui.setSearch(decodeURIComponent(m[1]))
-    history.replaceState(null, '', location.pathname)
-  }
+  applyLocationHash()
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('hashchange', applyLocationHash)
+  clearFocusHighlight()
 })
 
 watch(
@@ -389,6 +451,7 @@ function collect(): void {
                   :show-favicons="showFavicons"
                   :selectable="ui.selecting"
                   :selected="ui.isSelected(g.id)"
+                  :focused="focusedId === g.id"
                   @open-item="() => {}"
                 />
               </template>

@@ -134,7 +134,7 @@ onMounted(async () => {
             </span>
           </a>
         </li>
-        <li v-if="!filtered.length" class="empty">{{ t('search.noResult') }}</li>
+        <li v-if="!filtered.length" class="empty">{{ t('search.noResultTabs') }}</li>
       </ol>
     </template>
   </div>

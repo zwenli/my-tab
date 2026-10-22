@@ -44,9 +44,16 @@ async function doCollect(mode: CollectMode): Promise<void> {
   else await countTabs()
 }
 
-function openList(search = ''): void {
+/**
+ * 打开列表页。`hash` 直接拼在 URL 末尾，支持两种定位：
+ *   #g=<groupId> —— 滚到并高亮某个分组（「最近收起」用这个）
+ *   #q=<关键词> —— 带搜索词进入
+ * 注意不要拿组名当关键词用：默认组名是「2026-10-22 14:30 · 12 个标签」，
+ * 按标签检索永远命中不到，只会得到「没有匹配」的空页面。
+ */
+function openList(hash = ''): void {
   if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
-    const url = chrome.runtime.getURL('list.html') + (search ? `#q=${encodeURIComponent(search)}` : '')
+    const url = chrome.runtime.getURL('list.html') + hash
     if (chrome.tabs) {
       chrome.tabs.query({}, (tabs) => {
         const found = (tabs || []).find((x) => (x.url || '').startsWith(chrome.runtime.getURL('list.html')))
@@ -61,7 +68,7 @@ function openList(search = ''): void {
       return
     }
   }
-  window.open('list.html' + (search ? `#q=${encodeURIComponent(search)}` : ''), '_blank')
+  window.open('list.html' + hash, '_blank')
 }
 
 function openSettings(): void {
@@ -146,7 +153,12 @@ onMounted(async () => {
 
       <ul v-else class="recent">
         <li v-for="g in recent" :key="g.id" class="r-row">
-          <button class="r-main" type="button" :title="g.title" @click="openList(g.title)">
+          <button
+            class="r-main"
+            type="button"
+            :title="g.title"
+            @click="openList(`#g=${encodeURIComponent(g.id)}`)"
+          >
             <span class="r-title truncate">{{ g.title || t('group.untitled') }}</span>
             <span class="r-meta">{{ t('group.itemCount', { n: g.items.length }) }} · {{ humanTime(g.createdAt, dateLocale) }}</span>
           </button>

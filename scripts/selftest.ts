@@ -9,7 +9,7 @@ import { LIBRARY_FORMAT } from '../src/core/constants'
 import { filesToState, groupFileName, isConflictCopy, shortId, stateToFiles } from '../src/core/libraryFormat'
 import { badgeText, computeStats, countOpenTasks, createGroup, createTabItem, emptyState, normalizeState } from '../src/core/model'
 import * as M from '../src/core/mutations'
-import { searchItems } from '../src/core/search'
+import { searchGroups, searchItems } from '../src/core/search'
 import { exportToHtml, exportToText, parseText } from '../src/core/exportImport'
 import { buildPayload, linksText, packPayload, renderShareText, renderStandaloneHtml, unpackPayload } from '../src/core/share'
 import { applyVisibleOrder, clampPinnedIndex, hitTest, moveToInsertPoint, sameOrder } from '../src/core/dragOrder'
@@ -398,6 +398,35 @@ const run = async (): Promise<void> => {
     M.collectTabs(s, [tab('https://special-domain.com', '无关标题')], {})
     assert.equal(searchItems(s, 'special', { searchInUrl: true }).length, 1)
     assert.equal(searchItems(s, 'special', { searchInUrl: false }).length, 0)
+  })
+
+  await test('组名可检索（标题 / 备注），空词不出结果', () => {
+    const s = emptyState('d')
+    M.collectTabs(s, [tab('https://a.com', '第一个')], { title: '前端周报' })
+    const second = M.collectTabs(s, [tab('https://b.com', '第二个')], { title: '设计素材' })
+    M.updateGroup(s, second.group!.id, { note: '配色与字体' })
+
+    assert.equal(searchGroups(s, '前端').length, 1)
+    assert.equal(searchGroups(s, '周报').length, 1)
+    assert.equal(searchGroups(s, '配色').length, 1, '备注也要能命中')
+    assert.equal(searchGroups(s, '不存在的词').length, 0)
+    assert.equal(searchGroups(s, '').length, 0, '空查询不应返回全部分组')
+  })
+
+  await test('组内条目命中不算分组命中（避免两块结果重复）', () => {
+    const s = emptyState('d')
+    M.collectTabs(s, [tab('https://vuejs.org', 'Vue 文档')], { title: '资料汇总' })
+    assert.equal(searchGroups(s, 'vue').length, 0)
+  })
+
+  await test('默认组名（日期 · 数量）也能搜到，修复「最近收起」跳转空白', () => {
+    const s = emptyState('d')
+    const title = '2026-10-22 14:30 · 12 个标签'
+    M.collectTabs(s, [tab('https://a.com', '随便一个标题')], { title })
+    assert.equal(searchGroups(s, title).length, 1)
+    assert.equal(searchGroups(s, '14:30').length, 1)
+    // 同一串拿去按标签检索依旧是 0 条，这正是把入口从 #q 改成 #g 的原因
+    assert.equal(searchItems(s, title).length, 0)
   })
 
   console.log('\n[5] 导出 / 导入')

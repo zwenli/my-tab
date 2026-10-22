@@ -154,7 +154,11 @@ const enUS: Messages = {
   'selection.pickTarget': 'Pick a target group',
 
   'search.results': '{n} results',
-  'search.noResult': 'No matching tabs',
+  'search.groupsFound': '{n} groups matched',
+  'search.summary': '{n} tabs · {m} groups',
+  'search.jumpToGroup': 'Jump to this group',
+  'search.noResult': 'No matching tabs or groups',
+  'search.noResultTabs': 'No matching tabs',
   'search.noResultHint': 'Try another keyword, or the tab may have been deleted',
   'search.clear': 'Clear search',
   'search.inGroup': 'In “{name}”',

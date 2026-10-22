@@ -69,12 +69,40 @@ export function omniboxSuggest(state: MyTabState, query: string, limit = 6): Sea
   return searchItems(state, query).slice(0, limit)
 }
 
-/** 组级检索：标题 / 备注 / 组内域名命中 */
+/**
+ * 组命中打分。
+ *
+ * 只看组标题与备注 —— 组内条目命中有自己的结果区，若再算进组命中，
+ * 同一批条目会在「分组」和「标签」两块里重复出现，用户也看不出分组命中的原因。
+ */
+function scoreGroup(group: Group, tokens: string[]): number {
+  if (!tokens.length) return 0
+  const title = (group.title || '').toLowerCase()
+  const note = (group.note || '').toLowerCase()
+
+  let score = 0
+  for (const tk of tokens) {
+    let s = 0
+    if (title === tk) s += 120
+    else if (title.startsWith(tk)) s += 80
+    else if (title.includes(tk)) s += 50
+    if (note.includes(tk)) s += 30
+    if (s === 0) return 0 // 与条目检索保持一致的 AND 语义
+    score += s
+  }
+  if (group.starred) score += 6
+  return score
+}
+
+/** 组级检索：按标题 / 备注命中，得分高的在前 */
 export function searchGroups(state: MyTabState, query: string): Group[] {
   const tokens = tokenize(query)
-  if (!tokens.length) return state.groups ?? []
-  return (state.groups ?? []).filter((g) => {
-    const hay = `${g.title || ''} ${g.note || ''} ${(g.items || []).map((i) => `${i.title} ${i.url}`).join(' ')}`.toLowerCase()
-    return tokens.every((t) => hay.includes(t))
-  })
+  if (!tokens.length) return []
+  const hits: { group: Group; score: number }[] = []
+  for (const g of state.groups ?? []) {
+    const score = scoreGroup(g, tokens)
+    if (score > 0) hits.push({ group: g, score })
+  }
+  hits.sort((a, b) => b.score - a.score || (b.group.createdAt || 0) - (a.group.createdAt || 0))
+  return hits.map((h) => h.group)
 }

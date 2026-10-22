@@ -20,7 +20,9 @@ const props = defineProps({
   showFavicons: { type: Boolean, default: true },
   highlight: { type: String, default: '' },
   selectable: { type: Boolean, default: false },
-  selected: { type: Boolean, default: false }
+  selected: { type: Boolean, default: false },
+  /** 被「定位到该组」临时点亮（来自搜索结果或弹窗最近收起） */
+  focused: { type: Boolean, default: false }
 })
 
 const emit = defineEmits<{
@@ -193,7 +195,7 @@ function toggleSelect(): void {
 <template>
   <article
     class="card group"
-    :class="{ collapsed, target: isDropTarget, dragging: isDragSource, locked: group.locked, selected }"
+    :class="{ collapsed, target: isDropTarget, dragging: isDragSource, locked: group.locked, selected, focused }"
     :draggable="!selectable"
     @dragstart="onDragStart"
     @dragend="onDragEnd"
@@ -294,6 +296,26 @@ function toggleSelect(): void {
 .group.selected {
   border-color: var(--primary);
   background: var(--primary-soft);
+}
+/* 定位到该组时的临时描边：用 --primary-soft 做光环，和选中态区分开 */
+.group.focused {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-soft);
+  animation: focus-ring 1.2s ease-in-out 2;
+}
+@keyframes focus-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px var(--primary-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .group.focused {
+    animation: none;
+  }
 }
 .group.locked::before {
   content: '';

@@ -37,6 +37,22 @@ export const useUiStore = defineStore('ui', () => {
     searchQuery.value = q
   }
 
+  /**
+   * 「跳到某个分组」的请求。用对象 + 自增序号，保证对同一个组连续触发也能被 watch 到
+   * （单纯存 id 的话第二次点击值没变，watch 不响应）。
+   */
+  const focusTarget = ref<{ id: string; nonce: number } | null>(null)
+  let focusSeq = 0
+
+  /** 清掉搜索与筛选，让目标组一定在画布里可见，再交给列表页滚动高亮 */
+  function focusGroup(id: string): void {
+    searchQuery.value = ''
+    scope.type = SCOPE.ALL
+    scope.id = null
+    clearSelection()
+    focusTarget.value = { id, nonce: ++focusSeq }
+  }
+
   const isFiltering = computed<boolean>(() => !!searchQuery.value.trim() || scope.type !== SCOPE.ALL)
 
   /* ---------------------------- 多选 ---------------------------- */
@@ -126,6 +142,7 @@ export const useUiStore = defineStore('ui', () => {
     searchQuery.value = ''
     scope.type = SCOPE.ALL
     scope.id = null
+    focusTarget.value = null
     clearSelection()
     drag.value = null
     dropTarget.value = null
@@ -136,6 +153,8 @@ export const useUiStore = defineStore('ui', () => {
     scope,
     setScope,
     setSearch,
+    focusTarget,
+    focusGroup,
     isFiltering,
     selecting,
     selected,

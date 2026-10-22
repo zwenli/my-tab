@@ -164,7 +164,11 @@ const zhCN: Messages = {
 
   // ---------- 搜索 ----------
   'search.results': '找到 {n} 条结果',
-  'search.noResult': '没有匹配的标签',
+  'search.groupsFound': '匹配 {n} 个分组',
+  'search.summary': '找到 {n} 条标签 · {m} 个分组',
+  'search.jumpToGroup': '定位到该分组',
+  'search.noResult': '没有匹配的标签或分组',
+  'search.noResultTabs': '没有匹配的标签',
   'search.noResultHint': '换个关键词，或确认标签是否已被删除',
   'search.clear': '清除搜索',
   'search.inGroup': '来自「{name}」',
