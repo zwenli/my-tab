@@ -58,38 +58,68 @@ export const useUiStore = defineStore('ui', () => {
   /* ---------------------------- 多选 ---------------------------- */
 
   const selecting = ref(false)
-  const selected = ref<Set<string>>(new Set())
+  /**
+   * 多选分成两个集合：条目（标签）与整组。
+   * 两者 id 来源不同、动作语义也不同（删条目 ≠ 删组），混在一个 Set 里会让
+   * 「勾选标签组 → 删除勾选」这类批量动作静默失效，所以必须分开存。
+   */
+  const itemSelection = ref<Set<string>>(new Set())
+  const groupSelection = ref<Set<string>>(new Set())
 
-  const selectedIds = computed<string[]>(() => [...selected.value])
-  const selectedCount = computed<number>(() => selected.value.size)
-  const hasSelection = computed<boolean>(() => selected.value.size > 0)
+  /** 选中的条目 id（拖拽、批量移动都按条目处理） */
+  const selectedIds = computed<string[]>(() => [...itemSelection.value])
+  /** 选中的分组 id */
+  const selectedGroupIds = computed<string[]>(() => [...groupSelection.value])
+  const selectedCount = computed<number>(() => itemSelection.value.size + groupSelection.value.size)
+  const hasSelection = computed<boolean>(() => selectedCount.value > 0)
 
   function setSelecting(on: boolean): void {
     selecting.value = on
-    if (!on) selected.value = new Set()
+    if (!on) {
+      itemSelection.value = new Set()
+      groupSelection.value = new Set()
+    }
   }
 
-  function toggleSelected(id: string): void {
-    const next = new Set(selected.value)
+  /** 选中变空时自动退出多选模式 */
+  function syncSelecting(): void {
+    if (!hasSelection.value) selecting.value = false
+  }
+
+  function toggleItemSelected(id: string): void {
+    const next = new Set(itemSelection.value)
     if (next.has(id)) next.delete(id)
     else next.add(id)
-    selected.value = next
-    if (next.size === 0) selecting.value = false
+    itemSelection.value = next
+    syncSelecting()
   }
 
-  function isSelected(id: string): boolean {
-    return selected.value.has(id)
+  function toggleGroupSelected(id: string): void {
+    const next = new Set(groupSelection.value)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    groupSelection.value = next
+    syncSelecting()
   }
 
-  function selectMany(ids: string[]): void {
-    const next = new Set(selected.value)
+  function isItemSelected(id: string): boolean {
+    return itemSelection.value.has(id)
+  }
+
+  function isGroupSelected(id: string): boolean {
+    return groupSelection.value.has(id)
+  }
+
+  function selectItems(ids: string[]): void {
+    const next = new Set(itemSelection.value)
     for (const id of ids) next.add(id)
-    selected.value = next
-    selecting.value = next.size > 0
+    itemSelection.value = next
+    if (hasSelection.value) selecting.value = true
   }
 
   function clearSelection(): void {
-    selected.value = new Set()
+    itemSelection.value = new Set()
+    groupSelection.value = new Set()
     selecting.value = false
   }
 
@@ -157,14 +187,16 @@ export const useUiStore = defineStore('ui', () => {
     focusGroup,
     isFiltering,
     selecting,
-    selected,
     selectedIds,
+    selectedGroupIds,
     selectedCount,
     hasSelection,
     setSelecting,
-    toggleSelected,
-    isSelected,
-    selectMany,
+    toggleItemSelected,
+    toggleGroupSelected,
+    isItemSelected,
+    isGroupSelected,
+    selectItems,
     clearSelection,
     sidebarCollapsed,
     drag,

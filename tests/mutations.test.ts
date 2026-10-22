@@ -189,6 +189,24 @@ describe('收集与变更', () => {
     expect(s.groups[0]!.id).toBe(g1.id)
   })
 
+  it('removeGroups 批量删除分组，锁定的组跳过', () => {
+    const s = fresh()
+    const g1 = M.collectTabs(s, [tab('https://a.com', 'A')], {}).group!
+    const g2 = M.collectTabs(s, [tab('https://b.com', 'B')], {}).group!
+    const g3 = M.collectTabs(s, [tab('https://c.com', 'C')], {}).group!
+    M.toggleGroupLock(s, g2.id)
+    M.removeGroups(s, [g1.id, g2.id])
+    expect(s.groups.map((g) => g.id).sort()).toEqual([g2.id, g3.id].sort())
+    expect(s.groups.find((g) => g.id === g3.id)!.items.length, '未选中的组不受影响').toBe(1)
+  })
+
+  it('removeGroups 空数组不改动状态', () => {
+    const s = fresh()
+    M.collectTabs(s, [tab('https://a.com', 'A')], {})
+    M.removeGroups(s, [])
+    expect(s.groups.length).toBe(1)
+  })
+
   it('tidy 清理空组但保留锁定组', () => {
     const s = fresh()
     const g1 = M.collectTabs(s, [tab('https://a.com', 'A')], {}).group!

@@ -109,7 +109,7 @@ function restoreAll(): void {
 
 function diagSelectAll(): void {
   ui.setSelecting(true)
-  ui.selectMany(data.displayGroups.flatMap((g) => g.items.map((i) => i.id)))
+  ui.selectItems(data.displayGroups.flatMap((g) => g.items.map((i) => i.id)))
 }
 
 function openSettings(): void {

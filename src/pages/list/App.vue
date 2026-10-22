@@ -264,7 +264,7 @@ async function onCanvasDrop(e: DragEvent): Promise<void> {
   }
 
   if (drag.kind === 'tab' && blank) {
-    const ids = ui.hasSelection && ui.selected.has(drag.id) ? ui.selectedIds : [drag.id]
+    const ids = ui.isItemSelected(drag.id) ? ui.selectedIds : [drag.id]
     await dropTabsToNewGroup(ids)
   }
 }
@@ -321,7 +321,7 @@ function onKeydown(e: KeyboardEvent): void {
     const ids = showSearch.value
       ? []
       : visibleGroups.value.flatMap((g) => g.items.map((i) => i.id))
-    ui.selectMany(ids)
+    ui.selectItems(ids)
     return
   }
   if (e.key === 'Escape') {
@@ -450,7 +450,7 @@ function collect(): void {
                   :index="i"
                   :show-favicons="showFavicons"
                   :selectable="ui.selecting"
-                  :selected="ui.isSelected(g.id)"
+                  :selected="ui.isGroupSelected(g.id)"
                   :focused="focusedId === g.id"
                   @open-item="() => {}"
                 />

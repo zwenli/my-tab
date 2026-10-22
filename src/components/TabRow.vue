@@ -149,7 +149,7 @@ function onDragEnd(e: DragEvent): void {
 }
 
 function toggleSelect(): void {
-  ui.toggleSelected(props.item.id)
+  ui.toggleItemSelected(props.item.id)
 }
 
 const taskState = computed<'none' | 'open' | 'done'>(() => {

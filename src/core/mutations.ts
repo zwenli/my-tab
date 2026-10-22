@@ -160,6 +160,15 @@ export function removeGroup(state: MyTabState, id: string): MutationOutcome {
   return { state: touch(state) }
 }
 
+/** 批量删除分组（多选「删除勾选」用）；锁定的组会被跳过 */
+export function removeGroups(state: MyTabState, ids: string[] = []): MutationOutcome {
+  const set = new Set(ids)
+  if (!set.size) return { state }
+  const before = state.groups.length
+  state.groups = state.groups.filter((g) => !set.has(g.id) || g.locked)
+  return state.groups.length === before ? { state } : { state: touch(state) }
+}
+
 export function reorderGroups(state: MyTabState, orderedIds: string[] = []): MutationOutcome {
   const map = new Map(state.groups.map((g) => [g.id, g]))
   const out: Group[] = []

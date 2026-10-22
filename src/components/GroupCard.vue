@@ -164,7 +164,7 @@ async function onDrop(e: DragEvent): Promise<void> {
     ui.toast(t('group.lockedDrop'), 'warning')
     return
   }
-  const ids = ui.hasSelection && ui.selected.has(drag.id) ? ui.selectedIds : [drag.id]
+  const ids = ui.isItemSelected(drag.id) ? ui.selectedIds : [drag.id]
   await data.moveItemsToGroup(ids, props.group.id, -1)
   ui.clearSelection()
   ui.toast(t('toast.moved'), 'success')
@@ -188,7 +188,7 @@ function onItemDragStart(): void {
 }
 
 function toggleSelect(): void {
-  ui.toggleSelected(props.group.id)
+  ui.toggleGroupSelected(props.group.id)
 }
 </script>
 
@@ -264,7 +264,7 @@ function toggleSelect(): void {
           :group-id="group.id"
           :index="i"
           :selectable="selectable"
-          :selected="ui.isSelected(it.id)"
+          :selected="ui.isItemSelected(it.id)"
           :show-favicons="showFavicons"
           :highlight="highlight"
           @open="emit('open-item', $event)"

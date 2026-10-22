@@ -47,7 +47,7 @@ async function onDrop(e: DragEvent): Promise<void> {
   if (!drag) return
 
   if (drag.kind === 'tab') {
-    const ids = ui.hasSelection && ui.selected.has(drag.id) ? ui.selectedIds : [drag.id]
+    const ids = ui.isItemSelected(drag.id) ? ui.selectedIds : [drag.id]
     await data.copyItemsToQuickList(ids)
     ui.clearSelection()
     ui.toast(t('toast.moved'), 'success')

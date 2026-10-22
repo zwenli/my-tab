@@ -16,6 +16,7 @@
     "check:dnd": "node scripts/check-dnd.mjs",
     "check:library": "node scripts/check-library.mjs",
     "check:search": "node scripts/check-search.mjs",
+    "check:selection": "node scripts/check-selection.mjs",
     "demo": "tsx scripts/make-demo-page.ts && tsx scripts/make-ui-harness.ts",
     "preview": "vite preview --port 4173 --strictPort",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""

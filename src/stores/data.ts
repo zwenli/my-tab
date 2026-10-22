@@ -216,6 +216,13 @@ export const useDataStore = defineStore('data', () => {
     toggleGroupLock: (id: string) => run((s) => M.toggleGroupLock(s, id)),
     toggleGroupCollapsed: (id: string) => run((s) => M.toggleGroupCollapsed(s, id)),
     removeGroup: (id: string) => run((s) => M.removeGroup(s, id)),
+    removeGroups: (ids: string[]) => run((s) => M.removeGroups(s, ids)),
+    /**
+     * 一次性删除若干分组 + 若干条目（多选「删除勾选」）。
+     * 合成单次 mutate，避免写两次资料库、也避免中途只删掉一半。
+     */
+    removeGroupsAndItems: (groupIds: string[], itemIds: string[]) =>
+      run((s) => M.removeItems(M.removeGroups(s, groupIds).state, itemIds)),
     reorderGroups: (ids: string[]) => run((s) => M.reorderGroups(s, ids)),
     moveGroup: (id: string, index: number) => run((s) => M.moveGroup(s, id, index)),
     mergeGroups: (src: string, dst: string) => run((s) => M.mergeGroups(s, src, dst)),

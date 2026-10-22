@@ -79,7 +79,7 @@ async function onDropFolder(e: DragEvent, folder: Folder): Promise<void> {
   folderDrop.value = ''
   const drag = ui.drag
   if (!drag || drag.kind !== 'group') return
-  const ids = ui.hasSelection && ui.selected.has(drag.id) ? ui.selectedIds : [drag.id]
+  const ids = ui.isItemSelected(drag.id) ? ui.selectedIds : [drag.id]
   await data.moveGroupsToFolder(ids, folder.id)
   ui.clearSelection()
   ui.toast(t('toast.moved'), 'success')
