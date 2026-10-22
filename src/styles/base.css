@@ -273,7 +273,7 @@ ol {
 /* ---------- 提示气泡 ----------
  * 由 v-tip 指令（src/directives/tip.ts）在 <body> 上创建，fixed 定位：
  * 不惧父级 overflow 裁剪与遮罩，方向由指令按剩余空间自动翻转。
- * z-index 取在 菜单 120 / 多选条 150 / 弹窗 200 之上、Toast 400 之下。
+ * z-index 取在 多选条 150 / 下拉菜单 250 / 弹窗 200 之上、Toast 400 之下。
  */
 
 .tip-bubble {

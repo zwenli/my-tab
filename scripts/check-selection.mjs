@@ -9,6 +9,9 @@
  *   1. 只勾整组 → 删除：组真的消失（DOM + 落盘数据都验）
  *   2. 组 + 条目混合勾选 → 删除：组的条目不重复处理，另一个组的条目被精确删掉
  *   3. 勾到锁定组 → 删除：跳过该组并给出提示，其余照常删
+ *   4. 勾到锁定组 + 普通组 → 删除：锁定组保留、普通组照删
+ *   5. 「移动到组」下拉菜单：必须渲染到 <body> 且不被操作条裁掉/盖住（历史 bug：
+ *      菜单挂在 .bar 里，被 overflow-x:auto 剪掉，点了看不到），并能把整组并入目标组
  *
  * 用法（三个终端）：
  *   pnpm build && pnpm demo
@@ -78,6 +81,37 @@ window.__sel = {
   savedGroupByTitle(part) {
     const g = window.__sel.savedGroups().find((x) => (x.title || '').includes(part));
     return g ? { title: g.title, items: g.items.length } : null;
+  },
+  /* ---- 「移动到组」下拉菜单（被测的是 DropdownMenu 的 teleport 定位） ---- */
+  openMoveMenu() {
+    const b = document.querySelector('.bar .dd .trigger');
+    if (!b) return false;
+    b.click();
+    return true;
+  },
+  menu: () => document.querySelector('body > .menu'),
+  menuInfo() {
+    const m = window.__sel.menu();
+    if (!m) return null;
+    const r = m.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return {
+      items: [...m.querySelectorAll('.mi')].map((n) => n.textContent.trim()),
+      top: Math.round(r.top),
+      bottom: Math.round(r.bottom),
+      height: Math.round(r.height),
+      parentIsBody: m.parentElement === document.body,
+      inViewport: r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth,
+      hitInsideMenu: !!(hit && m.contains(hit))
+    };
+  },
+  menuClick(text) {
+    const m = window.__sel.menu();
+    if (!m) return false;
+    const b = [...m.querySelectorAll('.mi')].find((x) => x.textContent.includes(text));
+    if (!b) return false;
+    b.click();
+    return true;
   }
 };
 true
@@ -241,9 +275,36 @@ const main = async () => {
   const toasts2 = await evaluate(`window.__sel.toasts()`)
   check('提示跳过了 1 个锁定分组', toasts2.some((x) => x.includes('跳过') && x.includes('1')), toasts2.join(' | '))
 
+  /* ---------------- [5] 移动到组：菜单不能被操作条裁掉 ---------------- */
+  console.log('\n[5] 「移动到组」下拉菜单')
+  await goto()
+  await enterSelect()
+  check('勾选整组「Vue 3 组合式 API 调研」', await evaluate(`window.__sel.checkGroup('Vue 3 组合式 API 调研')`))
+  await sleep(250)
+  check('点开「移动到组」', await evaluate(`window.__sel.openMoveMenu()`))
+  await sleep(400)
+
+  const menu = await evaluate(`window.__sel.menuInfo()`)
+  check('菜单渲染到 <body>（历史 bug：被操作条的 overflow 裁掉）', !!menu && menu.parentIsBody, JSON.stringify(menu))
+  check('菜单完整落在视口内', !!menu && menu.inViewport, JSON.stringify(menu))
+  check('菜单中心点命中的是菜单自己（没被遮罩盖住）', !!menu && menu.hitInsideMenu, JSON.stringify(menu))
+  check('菜单列出了「新建分组 + 各分组」', !!menu && menu.items.length >= 6, JSON.stringify(menu?.items))
+
+  const shot2 = await send('Page.captureScreenshot', { format: 'png' })
+  const file2 = join(tmpdir(), 'mytab-check-selection-menu.png')
+  writeFileSync(file2, Buffer.from(shot2.data, 'base64'))
+
+  check('从菜单里选目标组', await evaluate(`window.__sel.menuClick('文件系统与同步方案')`))
+  await sleep(900)
+  const merged = await evaluate(`window.__sel.savedGroupByTitle('文件系统')`)
+  check('整组并入目标组（4 + 6 = 10 条）', !!merged && merged.items === 10, JSON.stringify(merged))
+  const titles3 = await evaluate(`window.__sel.titles()`)
+  check('源分组已消失', !titles3.some((x) => x.includes('Vue 3 组合式 API')), titles3.join(' | '))
+
   const failed = results.filter((r) => !r.ok).length
   console.log(`\n结果：${results.length - failed} 通过 / ${failed} 失败`)
   console.log(`截图：${file1}`)
+  console.log(`截图：${file2}`)
   ws.close()
   process.exit(failed ? 1 : 0)
 }
